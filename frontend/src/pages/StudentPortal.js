@@ -75,9 +75,9 @@ const StudentPortal = () => {
   const handleUpdate = async () => {
     try {
       const res = await updateStudentProfile(data.student._id, editForm);
-      // Main data update karein
+    console.log("Updated Data from DB:", res.data);
       setData({ ...data, student: res.data });
-      // Form ko sync karein
+    
       setEditForm({
         address: res.data.address || '',
         emergencyContact: res.data.emergencyContact || '',
