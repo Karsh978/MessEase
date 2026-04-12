@@ -7,6 +7,7 @@ const studentSchema = new mongoose.Schema({
         address: { type: String }, // Naya: Room/Hostel
     emergencyContact: { type: String }, // Naya: Parent's number
        email: { type: String }, 
+       profilePic: { type: String, default: "" },
     dailyRate: { type: Number, default: 100 },
     totalDue: { type: Number, default: 0 },
       joiningDate: { type: Date, default: Date.now }, 
