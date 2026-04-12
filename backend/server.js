@@ -17,7 +17,9 @@ const ADMIN_PIN = process.env.ADMIN_PIN;
 
 // 2. Middleware 
 app.use(cors());
-app.use(express.json());
+
+app.use(express.json({ limit: '10mb' })); 
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // 5. Authentication Middleware (Using Secure PIN from .env)
 const authAdmin = (req, res, next) => {
     const pin = req.headers['admin-pin'];
