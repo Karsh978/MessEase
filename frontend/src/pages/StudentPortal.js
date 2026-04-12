@@ -24,15 +24,14 @@ const StudentPortal = () => {
 
   const todayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date().getDay()];
 
-  // Login Function
+  // 1. Login Function
   const handleLogin = async () => {
     if(!phone || !password) return alert("Phone aur PIN dono bhariye!");
-    
     try {
       const res = await loginStudent({ phone, password });
       setData(res.data);
       
-      // Initializing Edit Form with current data
+      // Initializing Edit Form
       setEditForm({
         address: res.data.student.address || '',
         emergencyContact: res.data.student.emergencyContact || '',
@@ -40,14 +39,12 @@ const StudentPortal = () => {
         email: res.data.student.email || ''
       });
 
-      // Fetch Menu after login
+      // Fetch Menu
       try {
         const menuRes = await fetchMenu();
         const todayMenu = menuRes.data.find(m => m.day === todayName);
         setMenu(todayMenu);
-      } catch (mErr) {
-        console.log("Menu load failed");
-      }
+      } catch (mErr) { console.log("Menu load failed"); }
 
       setError('');
     } catch (err) {
@@ -55,69 +52,67 @@ const StudentPortal = () => {
     }
   };
 
-  // Image Selection & Conversion
+  // 2. Image Selection & Preview Logic
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 2000000) {
-        return alert("Photo bahut badi hai! Kripya 2MB se kam ki photo chunein.");
+      if (file.size > 1500000) { // 1.5MB Limit
+        alert("Photo bahut badi hai! Kripya 1.5MB se kam ki photo chunein.");
+        e.target.value = ""; 
+        return;
       }
 
       const reader = new FileReader();
       reader.onloadend = () => {
+        // Preview aur State dono update honge
         setEditForm({ ...editForm, profilePic: reader.result });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Profile Update Function
+  // 3. Final Profile Update Function
   const handleUpdate = async () => {
     try {
       const res = await updateStudentProfile(data.student._id, editForm);
+      // Main data update karein
       setData({ ...data, student: res.data });
+      // Form ko sync karein
+      setEditForm({
+        address: res.data.address || '',
+        emergencyContact: res.data.emergencyContact || '',
+        profilePic: res.data.profilePic || '',
+        email: res.data.email || ''
+      });
       setIsEditing(false);
       alert("Profile updated successfully! ✨");
     } catch (err) {
-      alert("Update failed! Try again.");
+      alert("Update failed! Backend limit check karein.");
     }
   };
 
-  // If not logged in, show Login Screen
+  // Login Screen
   if (!data) return (
     <div style={{ padding: '40px 20px', maxWidth: '400px', margin: 'auto', textAlign: 'center', fontFamily: 'Arial' }}>
       <div style={{ background: '#fff', padding: '30px', borderRadius: '15px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
         <h2 style={{ color: '#333', marginBottom: '20px' }}>Student Login</h2>
-        <input 
-          type="text" 
-          placeholder="Phone Number" 
-          style={inputStyle} 
-          onChange={(e) => setPhone(e.target.value)} 
-        />
-        <input 
-          type="password" 
-          placeholder="PIN (Password)" 
-          style={inputStyle} 
-          onChange={(e) => setPassword(e.target.value)} 
-        />
+        <input type="text" placeholder="Phone Number" style={inputStyle} onChange={(e) => setPhone(e.target.value)} />
+        <input type="password" placeholder="PIN" style={inputStyle} onChange={(e) => setPassword(e.target.value)} />
         <button onClick={handleLogin} style={btnStyle}>Login to Portal</button>
-        {error && <p style={{ color: 'red', marginTop: '15px', fontSize: '14px' }}>{error}</p>}
+        {error && <p style={{ color: 'red', marginTop: '15px' }}>{error}</p>}
       </div>
     </div>
   );
 
-  // After Login, show Portal
   return (
     <div style={{ padding: '15px', maxWidth: '500px', margin: 'auto', background: '#f4f7f6', minHeight: '100vh', fontFamily: 'Arial' }}>
       
-      {/* 🍲 TODAY'S MENU CARD */}
+      {/* 🍲 MENU CARD */}
       <div style={cardStyle('#fff', '2px solid #ff9800')}>
         <h4 style={{ margin: 0, color: '#e65100', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Utensils size={18} /> Aaj Khane Mein Kya Hai?
         </h4>
-        <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>
-          {menu ? menu.dish : "Menu jald hi update hoga!"}
-        </p>
+        <p style={{ fontSize: '18px', fontWeight: 'bold', margin: '10px 0' }}>{menu ? menu.dish : "Menu jald hi update hoga!"}</p>
         <small style={{ color: '#666' }}>{menu?.ingredients || "Healthy & Fresh"}</small>
       </div>
 
@@ -126,33 +121,33 @@ const StudentPortal = () => {
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           <div style={{ position: 'relative' }}>
             <img 
-              src={data.student.profilePic || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"} 
+              // Live Preview Logic: Editing mein editForm ki pic dikhao, warna saved wali
+              src={(isEditing ? editForm.profilePic : data.student.profilePic) || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"} 
               alt="Profile"
               style={{ width: '80px', height: '80px', borderRadius: '50%', border: '3px solid #333', objectFit: 'cover' }} 
             />
-            <button onClick={() => setIsEditing(true)} style={editIconStyle}><Camera size={14}/></button>
+            {!isEditing && (
+              <button onClick={() => setIsEditing(true)} style={editIconStyle}><Camera size={14}/></button>
+            )}
           </div>
           <div>
             <h3 style={{ margin: 0 }}>{data.student.name}</h3>
             <small style={{ color: '#666' }}>ID: {data.student.phone}</small>
-            <p style={{ margin: '5px 0 0 0', fontSize: '11px', color: '#888' }}>
-              Joined: {new Date(data.student.joiningDate).toLocaleDateString('en-GB')}
-            </p>
           </div>
         </div>
 
         {isEditing ? (
           <div style={{ marginTop: '20px', background: '#f9f9f9', padding: '15px', borderRadius: '10px' }}>
-            <label style={labelStyle}>Profile Photo Chunein</label>
+            <label style={labelStyle}>Change Profile Photo</label>
             <input type="file" accept="image/*" onChange={handleImageChange} style={inputStyle} />
             
-            <label style={labelStyle}>Email Address</label>
+            <label style={labelStyle}>Email</label>
             <input style={inputStyle} value={editForm.email} onChange={e => setEditForm({...editForm, email:e.target.value})} />
             
-            <label style={labelStyle}>Hostel / Room No.</label>
+            <label style={labelStyle}>Address (Room No)</label>
             <input style={inputStyle} value={editForm.address} onChange={e => setEditForm({...editForm, address:e.target.value})} />
             
-            <label style={labelStyle}>Emergency Contact Number</label>
+            <label style={labelStyle}>Emergency Contact</label>
             <input style={inputStyle} value={editForm.emergencyContact} onChange={e => setEditForm({...editForm, emergencyContact:e.target.value})} />
             
             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
@@ -164,131 +159,51 @@ const StudentPortal = () => {
           <div style={{ marginTop: '15px', fontSize: '14px', color: '#444', borderTop: '1px solid #eee', paddingTop: '15px' }}>
             <p style={infoRow}><Mail size={14} color="#666"/> {data.student.email || 'Email set karein'}</p>
             <p style={infoRow}><MapPin size={14} color="#666"/> {data.student.address || 'Address set karein'}</p>
-            <p style={infoRow}><PhoneCall size={14} color="#666"/> {data.student.emergencyContact || 'Emergency contact set karein'}</p>
+            <p style={infoRow}><PhoneCall size={14} color="#666"/> {data.student.emergencyContact || 'Emergency Contact'}</p>
           </div>
         )}
       </div>
 
       {/* 💰 BILL CARD */}
       <div style={cardStyle('#333', 'none')}>
-         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ color: '#ff9800', margin: 0 }}>Total Bill Due</h4>
-            <CreditCard color="#ff9800" size={20} />
-         </div>
+         <h4 style={{ color: '#ff9800', margin: 0 }}>Total Bill Due</h4>
          <h1 style={{ color: '#fff', margin: '10px 0', fontSize: '32px' }}>₹{data.student.totalDue}</h1>
-         <p style={{ color: '#bbb', fontSize: '12px', margin: 0 }}>Kripya samay par payment karein. - Didi</p>
+         <p style={{ color: '#bbb', fontSize: '12px', margin: 0 }}>Kripya samay par payment karein.</p>
       </div>
 
       {/* 📅 ATTENDANCE HISTORY */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0 10px' }}>
-        <Calendar size={18} />
-        <h3 style={{ margin: 0 }}>Attendance Record</h3>
+        <Calendar size={18} /> <h3 style={{ margin: 0 }}>Attendance Record</h3>
       </div>
 
       <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
         {data.attendance.map((h, i) => (
           <div key={i} style={historyItemStyle}>
-             <span style={{ fontSize: '14px', color: '#333' }}>{new Date(h.date).toLocaleDateString('en-GB')}</span>
+             <span style={{ fontSize: '14px' }}>{new Date(h.date).toLocaleDateString('en-GB')}</span>
              <div style={{ display: 'flex', gap: '8px' }}>
-                {h.breakfast && <span title="Breakfast" style={mealTag('#fff3e0', '#ff9800')}>B</span>}
-                {h.lunch && <span title="Lunch" style={mealTag('#e8f5e9', '#2e7d32')}>L</span>}
-                {h.dinner && <span title="Dinner" style={mealTag('#e8eaf6', '#3f51b5')}>D</span>}
-                {!h.breakfast && !h.lunch && !h.dinner && <span style={{color:'#ccc', fontSize:'12px'}}>No Meals</span>}
+                {h.breakfast && <span style={mealTag('#fff3e0', '#ff9800')}>B</span>}
+                {h.lunch && <span style={mealTag('#e8f5e9', '#2e7d32')}>L</span>}
+                {h.dinner && <span style={mealTag('#e8eaf6', '#3f51b5')}>D</span>}
              </div>
           </div>
         ))}
       </div>
       
-      {/* LOGOUT BUTTON */}
-      <button 
-        onClick={() => window.location.reload()} 
-        style={{ marginTop: '30px', width: '100%', padding: '12px', background: '#f44336', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}
-      >
-        <LogOut size={18}/> Logout From Portal
+      <button onClick={() => window.location.reload()} style={{ marginTop: '30px', width: '100%', padding: '12px', background: '#f44336', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>
+        <LogOut size={18}/> Logout
       </button>
     </div>
   );
 };
 
-// Reusable Style Objects
-const cardStyle = (bg, border) => ({ 
-  background: bg, 
-  border, 
-  padding: '20px', 
-  borderRadius: '15px', 
-  marginBottom: '15px', 
-  boxShadow: '0 4px 12px rgba(0,0,0,0.08)' 
-});
-
-const inputStyle = { 
-  width: '100%', 
-  padding: '12px', 
-  marginBottom: '10px', 
-  borderRadius: '8px', 
-  border: '1px solid #ddd', 
-  boxSizing: 'border-box' 
-};
-
-const labelStyle = {
-  fontSize: '12px',
-  color: '#666',
-  display: 'block',
-  marginBottom: '4px',
-  textAlign: 'left'
-};
-
-const btnStyle = { 
-  width: '100%', 
-  padding: '12px', 
-  background: '#333', 
-  color: '#fff', 
-  border: 'none', 
-  borderRadius: '8px', 
-  cursor: 'pointer', 
-  display: 'flex', 
-  justifyContent: 'center', 
-  alignItems: 'center', 
-  gap: '8px',
-  fontWeight: 'bold'
-};
-
-const editIconStyle = { 
-  position: 'absolute', 
-  bottom: 0, 
-  right: 0, 
-  background: '#ff9800', 
-  color: '#fff', 
-  border: 'none', 
-  borderRadius: '50%', 
-  padding: '6px', 
-  cursor: 'pointer',
-  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-};
-
-const historyItemStyle = { 
-  display: 'flex', 
-  justifyContent: 'space-between', 
-  padding: '12px 15px', 
-  background: '#fff', 
-  borderRadius: '10px', 
-  marginBottom: '8px', 
-  boxShadow: '0 2px 4px rgba(0,0,0,0.03)' 
-};
-
-const infoRow = { 
-  display: 'flex', 
-  alignItems: 'center', 
-  gap: '10px', 
-  margin: '8px 0' 
-};
-
-const mealTag = (bg, color) => ({
-  background: bg,
-  color: color,
-  padding: '2px 8px',
-  borderRadius: '4px',
-  fontSize: '12px',
-  fontWeight: 'bold'
-});
+// Styles
+const cardStyle = (bg, border) => ({ background: bg, border, padding: '20px', borderRadius: '15px', marginBottom: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' });
+const inputStyle = { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' };
+const labelStyle = { fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px', textAlign: 'left' };
+const btnStyle = { width: '100%', padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: 'bold' };
+const editIconStyle = { position: 'absolute', bottom: 0, right: 0, background: '#ff9800', color: '#fff', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer' };
+const historyItemStyle = { display: 'flex', justifyContent: 'space-between', padding: '12px 15px', background: '#fff', borderRadius: '10px', marginBottom: '8px' };
+const infoRow = { display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' };
+const mealTag = (bg, color) => ({ background: bg, color: color, padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' });
 
 export default StudentPortal;
