@@ -55,11 +55,26 @@ const StudentPortal = () => {
     }
   };
 
+  // Image Selection & Conversion
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2000000) {
+        return alert("Photo bahut badi hai! Kripya 2MB se kam ki photo chunein.");
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditForm({ ...editForm, profilePic: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Profile Update Function
   const handleUpdate = async () => {
     try {
       const res = await updateStudentProfile(data.student._id, editForm);
-      // Backend se updated student data lekar state update karna
       setData({ ...data, student: res.data });
       setIsEditing(false);
       alert("Profile updated successfully! ✨");
@@ -128,8 +143,8 @@ const StudentPortal = () => {
 
         {isEditing ? (
           <div style={{ marginTop: '20px', background: '#f9f9f9', padding: '15px', borderRadius: '10px' }}>
-            <label style={labelStyle}>Profile Image URL</label>
-            <input style={inputStyle} value={editForm.profilePic} onChange={e => setEditForm({...editForm, profilePic:e.target.value})} />
+            <label style={labelStyle}>Profile Photo Chunein</label>
+            <input type="file" accept="image/*" onChange={handleImageChange} style={inputStyle} />
             
             <label style={labelStyle}>Email Address</label>
             <input style={inputStyle} value={editForm.email} onChange={e => setEditForm({...editForm, email:e.target.value})} />
