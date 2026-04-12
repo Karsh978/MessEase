@@ -1,0 +1,12 @@
+/* frontend/src/index.css */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f0f2f5; /* Thoda premium gray look */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  -webkit-tap-highlight-color: transparent; /* Mobile touch fix */
+}
+
+input, button {
+  font-size: 16px; /* Mobile par auto-zoom rokne ke liye */
+}
