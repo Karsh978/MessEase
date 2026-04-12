@@ -221,6 +221,21 @@ const Dashboard = () => {
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Student name" required style={inp} />
           <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" required style={inp} />
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email ID" style={inp} />
+            <input 
+      type="password"
+      value={password} 
+      onChange={(e) => setPassword(e.target.value)} 
+      placeholder="Set PIN (e.g. 1234)" 
+      required
+      style={inputStyle}
+    />
+     <input 
+      type="number"
+      value={dailyRate} 
+      onChange={(e) => setDailyRate(e.target.value)} 
+      placeholder="Daily Rate (₹)" 
+      style={inputStyle}
+    />
           <button type="submit" style={{ width: '100%', padding: 12, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700 }}>Save Student</button>
         </form>
       </div>
