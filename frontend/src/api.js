@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // api.js mein sirf ye line badal do
-export const API = axios.create({ baseURL: 'https://messease-95bo.onrender.com' });
+export const API = axios.create({ baseURL: 'https://messease-95bo.onrender.com/api' });
 //security /
 API.interceptors.request.use((config) => {
     const pin = localStorage.getItem('adminPIN'); 
