@@ -56,11 +56,11 @@ const StudentPortal = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 1500000) {
-        alert("Photo bahut badi hai! Kripya 1.5MB se kam ki photo chunein.");
-        e.target.value = ""; 
-        return;
-      }
+      if (file.size > 300000) { 
+      alert("Photo bahut badi hai! Kripya 300KB se kam ki photo chunein (Passport size).");
+      e.target.value = ""; 
+      return;
+    }
 
       const reader = new FileReader();
       reader.onloadend = () => {
