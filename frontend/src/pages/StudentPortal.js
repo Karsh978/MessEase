@@ -56,7 +56,7 @@ const StudentPortal = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 1500000) { // 1.5MB Limit
+      if (file.size > 1500000) {
         alert("Photo bahut badi hai! Kripya 1.5MB se kam ki photo chunein.");
         e.target.value = ""; 
         return;
@@ -64,7 +64,6 @@ const StudentPortal = () => {
 
       const reader = new FileReader();
       reader.onloadend = () => {
-        // Preview aur State dono update honge
         setEditForm({ ...editForm, profilePic: reader.result });
       };
       reader.readAsDataURL(file);
@@ -121,7 +120,6 @@ const StudentPortal = () => {
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           <div style={{ position: 'relative' }}>
             <img 
-              // Live Preview Logic: Editing mein editForm ki pic dikhao, warna saved wali
               src={(isEditing ? editForm.profilePic : data.student.profilePic) || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"} 
               alt="Profile"
               style={{ width: '80px', height: '80px', borderRadius: '50%', border: '3px solid #333', objectFit: 'cover' }} 
@@ -192,6 +190,35 @@ const StudentPortal = () => {
       <button onClick={() => window.location.reload()} style={{ marginTop: '30px', width: '100%', padding: '12px', background: '#f44336', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>
         <LogOut size={18}/> Logout
       </button>
+
+      {/* ── FOOTER ── */}
+      <div style={{
+        marginTop: '24px',
+        borderTop: '1px solid #ddd',
+        paddingTop: '16px',
+        paddingBottom: '20px',
+        textAlign: 'center',
+        fontFamily: 'Arial'
+      }}>
+        <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#555' }}>
+          Developed by <span style={{ color: '#ff9800', fontWeight: 'bold' }}>Jivan</span>
+        </p>
+        <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#777' }}>
+          Any query? Contact us:
+        </p>
+        <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#555' }}>
+          📞 <a href="tel:6267216334" style={{ color: '#333', textDecoration: 'none' }}>6267216334</a>
+          {'  |  '}
+          ✉ <a href="mailto:jivankarsh87@gmail.com" style={{ color: '#333', textDecoration: 'none' }}>jivankarsh87@gmail.com</a>
+        </p>
+        <p style={{ margin: '10px 0 0', fontSize: '11px', color: '#aaa' }}>
+          <a href="/privacy-policy" style={{ color: '#ff9800', textDecoration: 'underline' }}>Privacy Policy</a>
+          {'  ·  '}
+          © {new Date().getFullYear()} Jivan. All rights reserved.
+        </p>
+      </div>
+      {/* ── END FOOTER ── */}
+
     </div>
   );
 };
