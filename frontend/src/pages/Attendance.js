@@ -33,26 +33,40 @@ const Attendance = () => {
   };
 
   const toggleMeal = async (studentId, mealType) => {
+    // Optimistic update - pehle UI update karo, phir API call
+    setStatusMap(prev => ({
+      ...prev,
+      [studentId]: {
+        ...prev[studentId],
+        [mealType]: !prev[studentId]?.[mealType]
+      }
+    }));
     try {
       await toggleMealAttendance({ studentId, date, mealType });
-      setMessage("Hisaab update ho gaya!");
-      loadData(); 
-      setTimeout(() => setMessage(''), 2000);
     } catch (err) {
-      alert("Error updating attendance");
+      // Error pe rollback
+      setStatusMap(prev => ({
+        ...prev,
+        [studentId]: {
+          ...prev[studentId],
+          [mealType]: !prev[studentId]?.[mealType]
+        }
+      }));
+      setMessage("❌ Update nahi hua, dobara try karo");
+      setTimeout(() => setMessage(''), 2000);
     }
   };
 
 const markAll = async (mealType) => {
-  if(window.confirm(`Kya sabka ${mealType} mark kar dein?`)) {
-    try {
-      
-      await API.post('/attendance/mark-all', { date: date, mealType: mealType });
-      alert("Success!");
-      loadData();
-    } catch (err) {
-      alert("Nahi ho paya. Backend terminal check karo.");
-    }
+  setMessage(`${mealType} sab ke liye mark ho raha hai...`);
+  try {
+    await API.post('/attendance/mark-all', { date: date, mealType: mealType });
+    setMessage(`✅ Sabka ${mealType} mark ho gaya!`);
+    loadData();
+    setTimeout(() => setMessage(''), 2000);
+  } catch (err) {
+    setMessage("❌ Nahi ho paya. Backend terminal check karo.");
+    setTimeout(() => setMessage(''), 3000);
   }
 };
 
@@ -108,7 +122,7 @@ const markAll = async (mealType) => {
         <button onClick={() => markAll('dinner')} style={allBtnStyle}>All Night</button>
       </div>
 
-      {message && <div style={{textAlign: 'center', color: 'green', fontWeight: 'bold', marginBottom: '10px'}}>{message}</div>}
+      {message && <div style={{textAlign: 'center', color: message.includes('❌') ? 'red' : 'green', fontWeight: 'bold', marginBottom: '10px'}}>{message}</div>}
 
       <div style={{ display: 'grid', gap: '12px' }}>
         {students.map(s => {

@@ -72,7 +72,7 @@ const Dashboard = () => {
   };
 
   const handleEmailReminder = async (student) => {
-    if (!student.email) return alert("Email ID nahi mili!");
+    if (!student.email) return alert("email not found!");
     try {
       await API.post('/students/send-email-reminder', {
         email: student.email,

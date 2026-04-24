@@ -26,7 +26,7 @@ const StudentPortal = () => {
 
   // 1. Login Function
   const handleLogin = async () => {
-    if(!phone || !password) return alert("Phone aur PIN dono bhariye!");
+    if(!phone || !password) return alert("fill-up both phone no and pin!");
     try {
       const res = await loginStudent({ phone, password });
       setData(res.data);
@@ -57,7 +57,7 @@ const StudentPortal = () => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 300000) { 
-      alert("Photo bahut badi hai! Kripya 300KB se kam ki photo chunein (Passport size).");
+      alert(" image is to larger! please choose 300kb maxim  (Passport size).");
       e.target.value = ""; 
       return;
     }
@@ -86,7 +86,7 @@ const StudentPortal = () => {
       setIsEditing(false);
       alert("Profile updated successfully! ✨");
     } catch (err) {
-      alert("Update failed! Backend limit check karein.");
+      alert("Update failed! please try again letter.");
     }
   };
 
