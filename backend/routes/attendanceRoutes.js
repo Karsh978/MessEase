@@ -3,6 +3,7 @@ const router = express.Router();
 const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 
+
 // 1. Get Attendance Status for a specific date
 router.get('/status/:date', async (req, res) => {
     try {

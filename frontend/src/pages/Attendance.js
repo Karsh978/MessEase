@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { fetchStudents, toggleMealAttendance, fetchAttendanceStatus, API } from '../api'; 
-import { Sun, SunMedium, Moon, CheckCircle2 } from 'lucide-react';
+import { Sun, SunMedium, Moon, CheckCircle2, Loader2 } from 'lucide-react';
 
 const Attendance = () => {
   const [students, setStudents] = useState([]);
   const [statusMap, setStatusMap] = useState({}); 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadData();
   }, [date]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const sRes = await fetchStudents();
       const aRes = await fetchAttendanceStatus(date);
@@ -26,17 +28,15 @@ const Attendance = () => {
       setStatusMap(map);
     } catch (err) {
       console.error("Data load nahi hua");
+    } finally {
+      setLoading(false); 
     }
   };
 
   const toggleMeal = async (studentId, mealType) => {
-    // 1. Price Decide karein
     const price = mealType === 'breakfast' ? 25 : 50;
-    
-    // 2. Check karein ki attendance lag rahi hai ya hat rahi hai
     const isRemoving = statusMap[studentId]?.[mealType];
 
-    // Frontend State Update (Optimistic Update)
     setStatusMap(prev => ({
       ...prev,
       [studentId]: {
@@ -45,15 +45,12 @@ const Attendance = () => {
       }
     }));
 
-    // Bill Update Logic (Minus hone se rokne ke liye)
     setStudents(prevStudents => 
       prevStudents.map(s => {
         if (s._id === studentId) {
           let newTotal = isRemoving 
             ? (s.totalDue - price) 
             : (s.totalDue + price);
-          
-          // Agar galti se zero se niche jaye toh 0 set kar do
           return { ...s, totalDue: Math.max(0, newTotal) };
         }
         return s;
@@ -63,7 +60,6 @@ const Attendance = () => {
     try {
       await toggleMealAttendance({ studentId, date, mealType });
     } catch (err) {
-      // Agar API fail ho jaye toh data reload kar lo purani state wapas lane ke liye
       loadData();
       setMessage("❌ Update nahi hua, dobara try karo");
       setTimeout(() => setMessage(''), 2000);
@@ -75,7 +71,7 @@ const Attendance = () => {
     try {
       await API.post('/attendance/mark-all', { date: date, mealType: mealType });
       setMessage(`✅ Sabka ${mealType} mark ho gaya!`);
-      loadData(); // Bulk update ke baad fresh data fetch karna zaroori hai
+      loadData(); 
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
       setMessage("❌ Nahi ho paya. Backend terminal check karo.");
@@ -83,7 +79,6 @@ const Attendance = () => {
     }
   };
 
-  // Styles (No changes here, kept as original)
   const allBtnStyle = {
     flex: 1,
     padding: '11px 8px',
@@ -133,6 +128,34 @@ const Attendance = () => {
       : '0 5px 0 #bbb, 0 6px 10px rgba(0,0,0,0.10)';
     e.currentTarget.style.transform = 'translateY(0)';
   };
+
+  // Main Return Statement
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '80vh',
+        gap: '15px'
+      }}>
+        <Loader2 size={50} color="#1a73e8" className="animate-spin" />
+        <p style={{ color: '#666', fontWeight: '500', fontSize: '16px' }}>
+          Data load ho raha hai, rukiye...
+        </p>
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          .animate-spin {
+            animation: spin 1s linear infinite;
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '10px', maxWidth: '600px', margin: 'auto', paddingBottom: '80px' }}>
