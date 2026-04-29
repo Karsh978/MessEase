@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2 } from 'lucide-react';
+import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2 } from 'lucide-react'; // Loader2 add kiya
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
@@ -32,12 +32,13 @@ const Dashboard = () => {
   const [expenses, setExpenses]     = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [alerts, setAlerts]         = useState([]);
+  const [loading, setLoading]       = useState(true); // Loading State Add Kiya
 
   const [name, setName]         = useState('');
   const [phone, setPhone]       = useState('');
   const [email, setEmail]       = useState(''); 
   const [password, setPassword] = useState('1234');
-  const [dailyRate, setDailyRate] = useState(100); // FIXED: Added setDailyRate
+  const [dailyRate, setDailyRate] = useState(100); 
 
   // Month Selector States
   const today = new Date();
@@ -49,7 +50,14 @@ const Dashboard = () => {
     "July", "August", "September", "October", "November", "December"
   ];
 
-  useEffect(() => { loadData(); getAlerts(); }, []);
+  useEffect(() => { 
+    const initLoad = async () => {
+      setLoading(true);
+      await Promise.all([loadData(), getAlerts()]);
+      setLoading(false);
+    };
+    initLoad();
+  }, []);
 
   const getAlerts = async () => {
     try { const res = await fetchAlerts(); setAlerts(res.data || []); }
@@ -66,7 +74,7 @@ const Dashboard = () => {
   };
 
   const sendWelcomeMessage = (student) => {
-    const portalURL = "https://mess-ease-fawn.vercel.app/my-portal"; // Updated to your live URL
+    const portalURL = "https://mess-ease-fawn.vercel.app/my-portal"; 
     const msg = `Namaste ${student.name}! 🙏\nDidi's Mess mein aapka swagat hai. 🍱\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\n🔗 Link: ${portalURL}\n\n📱 Login ID: ${student.phone}\n🔑 Aapka PIN: ${student.password || '1234'}\n\nKripya is link ko save kar lein. Dhanyawad! ✨`;
     window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
@@ -157,6 +165,20 @@ const Dashboard = () => {
   };
   
   const selectStyle = { padding: '10px', borderRadius: '8px', border: `1px solid ${S.border}`, flex: 1, background: S.white, fontSize: '13px', fontWeight: '600', color: S.navy };
+
+  // ── LOADING UI ──────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: S.pageBg }}>
+        <Loader2 size={50} color={S.navy} className="spinning-icon" />
+        <p style={{ marginTop: 15, color: S.navy, fontWeight: 600, fontSize: 16 }}>Didi's Mess loading...</p>
+        <style>{`
+          .spinning-icon { animation: rotate 1s linear infinite; }
+          @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
