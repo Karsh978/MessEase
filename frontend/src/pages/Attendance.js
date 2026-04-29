@@ -30,6 +30,13 @@ const Attendance = () => {
   };
 
   const toggleMeal = async (studentId, mealType) => {
+    // 1. Price Decide karein
+    const price = mealType === 'breakfast' ? 25 : 50;
+    
+    // 2. Check karein ki attendance lag rahi hai ya hat rahi hai
+    const isRemoving = statusMap[studentId]?.[mealType];
+
+    // Frontend State Update (Optimistic Update)
     setStatusMap(prev => ({
       ...prev,
       [studentId]: {
@@ -37,16 +44,27 @@ const Attendance = () => {
         [mealType]: !prev[studentId]?.[mealType]
       }
     }));
+
+    // Bill Update Logic (Minus hone se rokne ke liye)
+    setStudents(prevStudents => 
+      prevStudents.map(s => {
+        if (s._id === studentId) {
+          let newTotal = isRemoving 
+            ? (s.totalDue - price) 
+            : (s.totalDue + price);
+          
+          // Agar galti se zero se niche jaye toh 0 set kar do
+          return { ...s, totalDue: Math.max(0, newTotal) };
+        }
+        return s;
+      })
+    );
+
     try {
       await toggleMealAttendance({ studentId, date, mealType });
     } catch (err) {
-      setStatusMap(prev => ({
-        ...prev,
-        [studentId]: {
-          ...prev[studentId],
-          [mealType]: !prev[studentId]?.[mealType]
-        }
-      }));
+      // Agar API fail ho jaye toh data reload kar lo purani state wapas lane ke liye
+      loadData();
       setMessage("❌ Update nahi hua, dobara try karo");
       setTimeout(() => setMessage(''), 2000);
     }
@@ -57,7 +75,7 @@ const Attendance = () => {
     try {
       await API.post('/attendance/mark-all', { date: date, mealType: mealType });
       setMessage(`✅ Sabka ${mealType} mark ho gaya!`);
-      loadData();
+      loadData(); // Bulk update ke baad fresh data fetch karna zaroori hai
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
       setMessage("❌ Nahi ho paya. Backend terminal check karo.");
@@ -65,6 +83,7 @@ const Attendance = () => {
     }
   };
 
+  // Styles (No changes here, kept as original)
   const allBtnStyle = {
     flex: 1,
     padding: '11px 8px',
@@ -119,7 +138,6 @@ const Attendance = () => {
     <div style={{ padding: '10px', maxWidth: '600px', margin: 'auto', paddingBottom: '80px' }}>
       <h2 style={{ textAlign: 'center' }}>🍱 Daily Meals Tracker</h2>
 
-      {/* Date Selection Box */}
       <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
         <label style={{ fontSize: '14px', color: '#666' }}>Tarikh Chunein:</label>
         <input
@@ -130,38 +148,10 @@ const Attendance = () => {
         />
       </div>
 
-      {/* Bulk Mark Section */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
-        <button
-          onClick={() => markAll('breakfast')}
-          style={allBtnStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = '#1557b0'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 4px 10px rgba(26,115,232,0.5)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = '#1a73e8'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(26,115,232,0.4)'; }}
-          onMouseDown={e => { e.currentTarget.style.transform = 'translateY(1px)'; e.currentTarget.style.boxShadow = 'none'; }}
-          onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(26,115,232,0.4)'; }}
-        >
-          ☀ All Morn
-        </button>
-        <button
-          onClick={() => markAll('lunch')}
-          style={allBtnStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = '#1557b0'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 4px 10px rgba(26,115,232,0.5)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = '#1a73e8'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(26,115,232,0.4)'; }}
-          onMouseDown={e => { e.currentTarget.style.transform = 'translateY(1px)'; e.currentTarget.style.boxShadow = 'none'; }}
-          onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(26,115,232,0.4)'; }}
-        >
-          🌤 All Noon
-        </button>
-        <button
-          onClick={() => markAll('dinner')}
-          style={allBtnStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = '#1557b0'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 4px 10px rgba(26,115,232,0.5)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = '#1a73e8'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(26,115,232,0.4)'; }}
-          onMouseDown={e => { e.currentTarget.style.transform = 'translateY(1px)'; e.currentTarget.style.boxShadow = 'none'; }}
-          onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(26,115,232,0.4)'; }}
-        >
-          🌙 All Night
-        </button>
+        <button onClick={() => markAll('breakfast')} style={allBtnStyle}>☀ All Morn</button>
+        <button onClick={() => markAll('lunch')} style={allBtnStyle}>🌤 All Noon</button>
+        <button onClick={() => markAll('dinner')} style={allBtnStyle}>🌙 All Night</button>
       </div>
 
       {message && (
@@ -181,7 +171,6 @@ const Attendance = () => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                {/* Breakfast */}
                 <button
                   onClick={() => toggleMeal(s._id, 'breakfast')}
                   style={getMealBtnStyle(s._id, 'breakfast')}
@@ -190,10 +179,9 @@ const Attendance = () => {
                   onMouseLeave={(e) => handleMealMouseUp(e, s._id, 'breakfast')}
                 >
                   {sStatus.breakfast ? <CheckCircle2 size={26} color="#2e7d32" /> : <Sun size={26} color="#ff9800" />}
-                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.breakfast ? '#2e7d32' : '#888' }}>Morn</span>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.breakfast ? '#2e7d32' : '#888' }}>Morn (25)</span>
                 </button>
 
-                {/* Lunch */}
                 <button
                   onClick={() => toggleMeal(s._id, 'lunch')}
                   style={getMealBtnStyle(s._id, 'lunch')}
@@ -202,10 +190,9 @@ const Attendance = () => {
                   onMouseLeave={(e) => handleMealMouseUp(e, s._id, 'lunch')}
                 >
                   {sStatus.lunch ? <CheckCircle2 size={26} color="#2e7d32" /> : <SunMedium size={26} color="#f44336" />}
-                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.lunch ? '#2e7d32' : '#888' }}>Noon</span>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.lunch ? '#2e7d32' : '#888' }}>Noon (50)</span>
                 </button>
 
-                {/* Dinner */}
                 <button
                   onClick={() => toggleMeal(s._id, 'dinner')}
                   style={getMealBtnStyle(s._id, 'dinner')}
@@ -214,7 +201,7 @@ const Attendance = () => {
                   onMouseLeave={(e) => handleMealMouseUp(e, s._id, 'dinner')}
                 >
                   {sStatus.dinner ? <CheckCircle2 size={26} color="#2e7d32" /> : <Moon size={26} color="#3f51b5" />}
-                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.dinner ? '#2e7d32' : '#888' }}>Night</span>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.dinner ? '#2e7d32' : '#888' }}>Night (50)</span>
                 </button>
               </div>
             </div>

@@ -3,7 +3,7 @@ const router = express.Router();
 const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 
-// 1. Get Attendance Status for a specific date (Fixed 404 here)
+// 1. Get Attendance Status for a specific date
 router.get('/status/:date', async (req, res) => {
     try {
         const records = await Attendance.find({ date: req.params.date });
@@ -13,7 +13,7 @@ router.get('/status/:date', async (req, res) => {
     }
 });
 
-// 2. Toggle Meal (Breakfast, Lunch, Dinner)
+// 2. Toggle Meal (Breakfast, Lunch, Dinner) - FIXED LOGIC
 router.post('/toggle-meal', async (req, res) => {
     const { studentId, date, mealType } = req.body; 
     const rates = { breakfast: 25, lunch: 50, dinner: 50 };
@@ -26,9 +26,13 @@ router.post('/toggle-meal', async (req, res) => {
         if (!student) return res.status(404).json({ msg: "Student not found" });
 
         if (record[mealType]) {
+            // Attendance hatayi ja rahi hai (Uncheck)
             record[mealType] = false;
-            student.totalDue -= rates[mealType];
+            
+            // FIX: Math.max(0, ...) ensures bill never goes below zero
+            student.totalDue = Math.max(0, student.totalDue - rates[mealType]);
         } else {
+            // Attendance lagayi ja rahi hai (Check)
             record[mealType] = true;
             student.totalDue += rates[mealType];
         }
@@ -41,7 +45,7 @@ router.post('/toggle-meal', async (req, res) => {
     }
 });
 
-// 3. Mark Full Attendance (Old method if needed)
+// 3. Mark Full Attendance (Purana feature)
 router.post('/mark', async (req, res) => {
     const { studentId, date, status } = req.body;
     try {
@@ -53,6 +57,7 @@ router.post('/mark', async (req, res) => {
 
         if (status === 'Present') {
             const student = await Student.findById(studentId);
+            // Safety check yahan bhi add kar sakte hain dailyRate ke liye
             student.totalDue += student.dailyRate;
             await student.save();
         }
