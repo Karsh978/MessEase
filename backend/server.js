@@ -53,6 +53,7 @@ app.use('/api/menu/update', authAdmin);
 // ============================================================
 
 // [NAYA FEATURE] - DIRECT PORTAL ACCESS BINA PASSWORD KE
+// server.js mein ye add karein:
 app.get('/api/students/portal-direct/:id', async (req, res) => {
     try {
         const student = await Student.findById(req.params.id);

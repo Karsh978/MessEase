@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios'; // Added axios for direct login
 import { loginStudent, fetchMenu, updateStudentProfile } from '../api';
 import { 
   User, Calendar, CreditCard, Utensils, MapPin, 
@@ -13,6 +14,7 @@ const StudentPortal = () => {
   const [menu, setMenu] = useState(null);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false); // New Loading State
 
   // Edit Form States
   const [editForm, setEditForm] = useState({
@@ -24,30 +26,63 @@ const StudentPortal = () => {
 
   const todayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date().getDay()];
 
-  // 1. Login Function
+  // 0. Direct Login Logic (Added)
+  useEffect(() => {
+    // Check if there is a studentId in URL params or localStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentId = urlParams.get('id'); 
+    
+    if (studentId) {
+      handleDirectLogin(studentId);
+    }
+  }, []);
+
+  const setupData = async (resData) => {
+    setData(resData);
+    setEditForm({
+      address: resData.student.address || '',
+      emergencyContact: resData.student.emergencyContact || '',
+      profilePic: resData.student.profilePic || '',
+      email: resData.student.email || ''
+    });
+
+    // Fetch Menu
+    try {
+      const menuRes = await fetchMenu();
+      const todayMenu = menuRes.data.find(m => m.day === todayName);
+      setMenu(todayMenu);
+    } catch (mErr) { 
+      console.log("Menu load failed"); 
+    }
+  };
+
+  const handleDirectLogin = async (studentId) => {
+    try {
+      setLoading(true);
+      // Replace with your actual backend URL
+      const res = await axios.get(`https://YOUR-BACKEND-URL.com/api/students/portal-direct/${studentId}`);
+      
+      if(res.data) {
+        await setupData(res.data);
+      }
+      setLoading(false);
+    } catch (err) {
+      console.log("Direct login failed, showing login form...");
+      setLoading(false); 
+    }
+  };
+
+  // 1. Regular Login Function
   const handleLogin = async () => {
     if(!phone || !password) return alert("fill-up both phone no and pin!");
     try {
+      setLoading(true);
       const res = await loginStudent({ phone, password });
-      setData(res.data);
-      
-      // Initializing Edit Form
-      setEditForm({
-        address: res.data.student.address || '',
-        emergencyContact: res.data.student.emergencyContact || '',
-        profilePic: res.data.student.profilePic || '',
-        email: res.data.student.email || ''
-      });
-
-      // Fetch Menu
-      try {
-        const menuRes = await fetchMenu();
-        const todayMenu = menuRes.data.find(m => m.day === todayName);
-        setMenu(todayMenu);
-      } catch (mErr) { console.log("Menu load failed"); }
-
+      await setupData(res.data);
       setError('');
+      setLoading(false);
     } catch (err) {
+      setLoading(false);
       setError(err.response?.data?.msg || "Ghalat Number ya PIN!");
     }
   };
@@ -57,11 +92,10 @@ const StudentPortal = () => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 300000) { 
-      alert(" image is to larger! please choose 300kb maxim  (Passport size).");
-      e.target.value = ""; 
-      return;
-    }
-
+        alert(" image is to larger! please choose 300kb maxim (Passport size).");
+        e.target.value = ""; 
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setEditForm({ ...editForm, profilePic: reader.result });
@@ -74,9 +108,7 @@ const StudentPortal = () => {
   const handleUpdate = async () => {
     try {
       const res = await updateStudentProfile(data.student._id, editForm);
-    console.log("Updated Data from DB:", res.data);
       setData({ ...data, student: res.data });
-    
       setEditForm({
         address: res.data.address || '',
         emergencyContact: res.data.emergencyContact || '',
@@ -86,9 +118,16 @@ const StudentPortal = () => {
       setIsEditing(false);
       alert("Profile updated successfully! ✨");
     } catch (err) {
-      alert("Update failed! please try again letter.");
+      alert("Update failed! please try again later.");
     }
   };
+
+  // Loading Screen
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'Arial' }}>
+      <p>Loading Portal...</p>
+    </div>
+  );
 
   // Login Screen
   if (!data) return (
@@ -192,20 +231,11 @@ const StudentPortal = () => {
       </button>
 
       {/* ── FOOTER ── */}
-      <div style={{
-        marginTop: '24px',
-        borderTop: '1px solid #ddd',
-        paddingTop: '16px',
-        paddingBottom: '20px',
-        textAlign: 'center',
-        fontFamily: 'Arial'
-      }}>
+      <div style={{ marginTop: '24px', borderTop: '1px solid #ddd', paddingTop: '16px', paddingBottom: '20px', textAlign: 'center', fontFamily: 'Arial' }}>
         <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#555' }}>
           Developed by <span style={{ color: '#ff9800', fontWeight: 'bold' }}>Jivan</span>
         </p>
-        <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#777' }}>
-          Any query? Contact us:
-        </p>
+        <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#777' }}>Any query? Contact us:</p>
         <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#555' }}>
           📞 <a href="tel:6267216334" style={{ color: '#333', textDecoration: 'none' }}>6267216334</a>
           {'  |  '}
@@ -217,8 +247,6 @@ const StudentPortal = () => {
           © {new Date().getFullYear()} Jivan. All rights reserved.
         </p>
       </div>
-      {/* ── END FOOTER ── */}
-
     </div>
   );
 };
@@ -232,5 +260,5 @@ const editIconStyle = { position: 'absolute', bottom: 0, right: 0, background: '
 const historyItemStyle = { display: 'flex', justifyContent: 'space-between', padding: '12px 15px', background: '#fff', borderRadius: '10px', marginBottom: '8px' };
 const infoRow = { display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' };
 const mealTag = (bg, color) => ({ background: bg, color: color, padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' });
-
+    
 export default StudentPortal;
