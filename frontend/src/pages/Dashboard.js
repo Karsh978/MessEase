@@ -73,14 +73,11 @@ const Dashboard = () => {
     } catch (err) { console.log("Data load error"); }
   };
 
- const sendWelcomeMessage = (student) => {
-  // AB LINK MEIN STUDENT KI ID BHI JAYEGI
-  const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`; 
-  
-  const msg = `Namaste ${student.name}! 🙏\nDidi's Mess mein aapka swagat hai. 🍱\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par click karke LIVE dekh sakte hain:\n\n🔗 Aapka Link: ${portalURL}\n\nAb login karne ki koi zaroorat nahi hai. Kripya is link ko save kar lein. Dhanyawad! ✨`;
-  
-  window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
-};
+  const sendWelcomeMessage = (student) => {
+    const portalURL = "https://mess-ease-fawn.vercel.app/my-portal"; 
+    const msg = `Namaste ${student.name}! 🙏\nDidi's Mess mein aapka swagat hai. 🍱\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\n🔗 Link: ${portalURL}\n\n📱 Login ID: ${student.phone}\n🔑 Aapka PIN: ${student.password || '1234'}\n\nKripya is link ko save kar lein. Dhanyawad! ✨`;
+    window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
 
   const handleEmailReminder = async (student) => {
     if (!student.email) return alert("email not found!");
