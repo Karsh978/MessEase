@@ -42,7 +42,6 @@ const Dashboard = () => {
   const [password, setPassword]   = useState('1234');
   const [dailyRate, setDailyRate] = useState(0);
 
-  // ✅ Edit Modal State
   const [editStudent, setEditStudent]         = useState(null);
   const [editName, setEditName]               = useState('');
   const [editPhone, setEditPhone]             = useState('');
@@ -154,18 +153,15 @@ const Dashboard = () => {
     window.location.href = `tel:${phoneNumber}`;
   };
 
-  // ✅ Edit Modal Open
   const openEdit = (s) => {
     setEditStudent(s);
     setEditName(s.name || '');
     setEditPhone(s.phone || '');
     setEditEmail(s.email || '');
-    // joiningDate ya createdAt jo bhi mile
     const jd = s.joiningDate || s.createdAt || '';
     setEditJoiningDate(jd ? new Date(jd).toISOString().split('T')[0] : '');
   };
 
-  // ✅ Edit Save — backend call
   const handleEditSave = async () => {
     try {
       await API.put(`/students/${editStudent._id}`, {
@@ -193,7 +189,22 @@ const Dashboard = () => {
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const inp = { width: '100%', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${S.border}`, fontSize: 14, color: S.text, background: '#F8FAFF', outline: 'none', marginBottom: 10, boxSizing: 'border-box' };
+  // ── Responsive style helpers ──────────────────────────────
+  const isMobile = window.innerWidth <= 480;
+
+  const inp = {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: 10,
+    border: `1.5px solid ${S.border}`,
+    fontSize: 15,           // slightly bigger — easier to tap
+    color: S.text,
+    background: '#F8FAFF',
+    outline: 'none',
+    marginBottom: 10,
+    boxSizing: 'border-box',
+    WebkitAppearance: 'none', // remove iOS default styling
+  };
 
   const ibtn = (variant) => {
     const map = {
@@ -203,17 +214,47 @@ const Dashboard = () => {
       call:   { background: S.blueBg,   color: S.blue   },
       edit:   { background: S.purpleBg, color: S.purple },
     };
-    return { border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', ...map[variant] };
+    return {
+      border: 'none',
+      borderRadius: 8,
+      fontSize: 11,
+      fontWeight: 700,
+      cursor: 'pointer',
+      // bigger tap target on mobile
+      padding: isMobile ? '9px 9px' : '7px 10px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 3,
+      whiteSpace: 'nowrap',
+      minWidth: 32,           // minimum tap size
+      minHeight: 32,
+      justifyContent: 'center',
+      ...map[variant],
+    };
   };
 
-  const selectStyle = { padding: '10px', borderRadius: '8px', border: `1px solid ${S.border}`, flex: 1, background: S.white, fontSize: '13px', fontWeight: '600', color: S.navy };
+  const selectStyle = {
+    padding: '10px',
+    borderRadius: '8px',
+    border: `1px solid ${S.border}`,
+    flex: 1,
+    background: S.white,
+    fontSize: '13px',
+    fontWeight: '600',
+    color: S.navy,
+    WebkitAppearance: 'none',
+    appearance: 'none',
+  };
 
   if (loading) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: S.pageBg }}>
         <Loader2 size={50} color={S.navy} className="spinning-icon" />
         <p style={{ marginTop: 15, color: S.navy, fontWeight: 600, fontSize: 16 }}>Didi's Mess loading...</p>
-        <style>{`.spinning-icon { animation: rotate 1s linear infinite; } @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        <style>{`
+          .spinning-icon { animation: rotate 1s linear infinite; }
+          @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        `}</style>
       </div>
     );
   }
@@ -221,27 +262,86 @@ const Dashboard = () => {
   return (
     <div style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
 
-      {/* ✅ EDIT MODAL */}
-      {editStudent && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }}>
-          <div style={{ background: S.white, borderRadius: 20, padding: 20, width: '100%', maxWidth: 400 }}>
+      {/* ── GLOBAL RESPONSIVE CSS ── */}
+      <style>{`
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; }
 
-            {/* Modal Header */}
+        /* Inputs & selects — prevent iOS zoom (font must be >=16px on focus) */
+        input, select, textarea {
+          font-size: 16px !important;
+          -webkit-text-size-adjust: 100%;
+        }
+
+        /* Student card buttons — wrap on very small screens */
+        .btn-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          justify-content: flex-end;
+        }
+
+        /* Stats grid — 2 columns on very small phones */
+        @media (max-width: 360px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+
+        /* Modal scroll on small screens */
+        .edit-modal-inner {
+          max-height: 90vh;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        /* Make date input tap-friendly */
+        input[type="date"] {
+          min-height: 44px;
+        }
+
+        /* Tap highlight removal */
+        button { -webkit-tap-highlight-color: transparent; }
+      `}</style>
+
+      {/* EDIT MODAL */}
+      {editStudent && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.55)',
+          zIndex: 999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '0 16px',
+          // safe area for notch phones
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}>
+          <div className="edit-modal-inner" style={{
+            background: S.white,
+            borderRadius: 20,
+            padding: 20,
+            width: '100%',
+            maxWidth: 420,
+          }}>
+            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: S.navy, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Pencil size={15} color={S.purple} /> Edit Student
               </div>
-              <button onClick={() => setEditStudent(null)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 6, cursor: 'pointer' }}>
+              <button
+                onClick={() => setEditStudent(null)}
+                style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, cursor: 'pointer', minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Fields */}
-            <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Student name" style={inp} />
-            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone number" style={inp} />
-            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email ID" style={inp} />
+            <input value={editName}  onChange={e => setEditName(e.target.value)}  placeholder="Student name"  style={inp} />
+            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone number"  style={inp} />
+            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email ID"      style={inp} />
 
-            {/* Joining Date */}
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 12, color: S.muted, fontWeight: 600, display: 'block', marginBottom: 4 }}>📅 Joining Date</label>
               <input
@@ -252,22 +352,31 @@ const Dashboard = () => {
               />
             </div>
 
-            {/* Save Button */}
             <button
               onClick={handleEditSave}
-              style={{ width: '100%', padding: 12, background: S.purple, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              style={{ width: '100%', padding: 14, background: S.purple, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', marginTop: 14, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48 }}
             >
               <Check size={16} /> Save Changes
             </button>
-
           </div>
         </div>
       )}
 
       {/* TOP BAR */}
-      <div style={{ background: S.white, padding: '18px 16px 14px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ fontSize: 17, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
-        {alerts.length > 0 && <BellRing size={20} color="#ff9800" />}
+      <div style={{
+        background: S.white,
+        padding: '16px 16px 13px',
+        paddingTop: 'calc(16px + env(safe-area-inset-top))', // notch safe
+        borderBottom: `1px solid ${S.border}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
+        {alerts.length > 0 && <BellRing size={22} color="#ff9800" />}
       </div>
 
       {/* MONTH SELECTOR */}
@@ -297,7 +406,7 @@ const Dashboard = () => {
           <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>📅 Students Joining Dates</div>
           {students.length === 0 && <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>}
           {students.map(s => (
-            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 4px', borderBottom: `1px solid ${S.border}` }}>
+            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 4px', borderBottom: `1px solid ${S.border}` }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: S.text }}>{s.name}</span>
               <span style={{ fontSize: 12, color: S.muted }}>
                 {s.joiningDate
@@ -312,7 +421,7 @@ const Dashboard = () => {
       )}
 
       {/* STATS CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '0 12px 14px' }}>
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '0 12px 14px' }}>
         <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
           <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
           <div style={{ fontSize: 11, fontWeight: 700, color: S.green }}>₹{totalRevenue}</div>
@@ -336,12 +445,17 @@ const Dashboard = () => {
         <div style={{ margin: '0 12px 14px', background: S.amberBg, borderRadius: 14, padding: '12px', border: `1px solid ${S.amberBorder}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>⚠️ Payment Alerts ({alerts.length})</div>
           {alerts.map(s => (
-            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: S.white, padding: '10px', borderRadius: 8, marginBottom: 5 }}>
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 600, display: 'block' }}>{s.name}</span>
+            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: S.white, padding: '10px', borderRadius: 8, marginBottom: 5, gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
                 <span style={{ fontSize: 10, color: S.red }}>{s.daysPassed} Days Overdue</span>
               </div>
-              <button onClick={() => handleEmailReminder(s)} style={{ fontSize: 11, background: S.red, border: 'none', color: S.white, fontWeight: 700, padding: '5px 10px', borderRadius: 5 }}>Alert Email</button>
+              <button
+                onClick={() => handleEmailReminder(s)}
+                style={{ fontSize: 11, background: S.red, border: 'none', color: S.white, fontWeight: 700, padding: '8px 10px', borderRadius: 5, whiteSpace: 'nowrap', minHeight: 36, cursor: 'pointer' }}
+              >
+                Alert Email
+              </button>
             </div>
           ))}
         </div>
@@ -353,11 +467,15 @@ const Dashboard = () => {
           <UserPlus size={16} color={S.navy}/> New Registration
         </div>
         <form onSubmit={handleAdd}>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Student name" required style={inp} />
-          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number (Login ID)" required style={inp} />
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email ID (for alerts)" style={inp} />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" required style={inp} />
-          <button type="submit" style={{ width: '100%', padding: 12, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>
+          <input value={name}     onChange={e => setName(e.target.value)}     placeholder="Student name"              required style={inp} />
+          <input value={phone}    onChange={e => setPhone(e.target.value)}    placeholder="Phone number (Login ID)"   required style={inp} />
+          <input value={email}    onChange={e => setEmail(e.target.value)}    placeholder="Email ID (for alerts)"              style={inp} />
+          <input type="password"
+                 value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" required style={inp} />
+          <button
+            type="submit"
+            style={{ width: '100%', padding: 14, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 15, minHeight: 48 }}
+          >
             Register Student
           </button>
         </form>
@@ -365,28 +483,48 @@ const Dashboard = () => {
 
       {/* SEARCH */}
       <div style={{ padding: '0 12px 15px' }}>
-        <input type="text" placeholder="🔍 Search students..." style={{ ...inp, borderRadius: 25, marginBottom: 0 }} onChange={e => setSearchTerm(e.target.value)} />
+        <input
+          type="text"
+          placeholder="🔍 Search students..."
+          style={{ ...inp, borderRadius: 25, marginBottom: 0 }}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {/* STUDENT LIST */}
       <div style={{ padding: '0 12px' }}>
         {filteredStudents.map(s => (
-          <div key={s._id} style={{ background: S.white, borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${S.border}`, borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}` }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{getInitials(s.name)}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{s.name}</div>
-              <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
+          <div key={s._id} style={{
+            background: S.white,
+            borderRadius: 16,
+            padding: '12px 10px',
+            marginBottom: 10,
+            border: `1px solid ${S.border}`,
+            borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}`,
+          }}>
+            {/* Top row: avatar + name/bill + buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {/* Avatar */}
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
+                {getInitials(s.name)}
+              </div>
+              {/* Name + Bill */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {/* ✅ CALL BUTTON */}
-              <button onClick={() => handleCall(s.phone)} style={ibtn('call')}><Phone size={14}/></button>
-              {/* ✅ EDIT BUTTON — Call ke paas */}
-              <button onClick={() => openEdit(s)} style={ibtn('edit')}><Pencil size={14}/></button>
 
-              <button onClick={() => downloadBill(s)} style={ibtn('bill')}><Download size={14} /></button>
-              <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')}><MessageCircle size={14} /></button>
-              <button onClick={() => handlePay(s._id)} style={ibtn('paid')}>Paid</button>
-              <button onClick={() => handleDelete(s._id)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 7 }}><Trash2 size={14}/></button>
+            {/* Button row — separate line so buttons don't overflow on small screens */}
+            <div className="btn-row" style={{ marginTop: 10 }}>
+              <button onClick={() => handleCall(s.phone)}    style={ibtn('call')}><Phone   size={14}/></button>
+              <button onClick={() => openEdit(s)}            style={ibtn('edit')}><Pencil  size={14}/></button>
+              <button onClick={() => downloadBill(s)}        style={ibtn('bill')}><Download size={14}/></button>
+              <button onClick={() => sendWelcomeMessage(s)}  style={ibtn('link')}><MessageCircle size={14}/></button>
+              <button onClick={() => handlePay(s._id)}       style={ibtn('paid')}>Paid</button>
+              <button onClick={() => handleDelete(s._id)}    style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 9, cursor: 'pointer', minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Trash2 size={14}/>
+              </button>
             </div>
           </div>
         ))}
