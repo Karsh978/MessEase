@@ -40,7 +40,7 @@ const Dashboard = () => {
   const [phone, setPhone]       = useState('');
   const [email, setEmail]       = useState(''); 
   const [password, setPassword] = useState('1234');
-  const [dailyRate, setDailyRate] = useState(100); 
+  const [dailyRate, setDailyRate] = useState(0); 
 
   // Month Selector States
   const today = new Date();
@@ -245,16 +245,48 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* REGISTER FORM */}
+    
+     {/* REGISTER FORM */}
       <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}><UserPlus size={16} color={S.navy}/> New Registration</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <UserPlus size={16} color={S.navy}/> New Registration
+        </div>
         <form onSubmit={handleAdd}>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Student name" required style={inp} />
-          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number (Login ID)" required style={inp} />
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email ID (for alerts)" style={inp} />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Set PIN (e.g. 1234)" required style={inp} />
-          <input type="number" value={dailyRate} onChange={e => setDailyRate(e.target.value)} placeholder="Daily Rate (₹)" style={inp} />
-          <button type="submit" style={{ width: '100%', padding: 12, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>Register Student</button>
+          <input 
+            value={name} 
+            onChange={e => setName(e.target.value)} 
+            placeholder="Student name" 
+            required 
+            style={inp} 
+          />
+          <input 
+            value={phone} 
+            onChange={e => setPhone(e.target.value)} 
+            placeholder="Phone number (Login ID)" 
+            required 
+            style={inp} 
+          />
+          <input 
+            value={email} 
+            onChange={e => setEmail(e.target.value)} 
+            placeholder="Email ID (for alerts)" 
+            style={inp} 
+          />
+          {/* Placeholder updated here */}
+          <input 
+            type="password" 
+            value={password} 
+            onChange={e => setPassword(e.target.value)} 
+            placeholder="Enter Password (e.g. 1234)" 
+            required 
+            style={inp} 
+          />
+          
+          {/* Daily Rate Input has been removed from here */}
+
+          <button type="submit" style={{ width: '100%', padding: 12, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>
+            Register Student
+          </button>
         </form>
       </div>
 
