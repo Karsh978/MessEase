@@ -1,102 +1,107 @@
 import React, { useState, useEffect } from 'react';
-import { loginStudent, fetchMenu, updateStudentProfile } from '../api';
+import { useParams } from 'react-router-dom';
+import { loginStudent, fetchMenu, updateStudentProfile, API } from '../api';
 import { 
   User, Calendar, CreditCard, Utensils, MapPin, 
-  PhoneCall, Mail, Camera, Save, XCircle, LogOut 
+  PhoneCall, Mail, Camera, Save, XCircle, LogOut, Loader2 
 } from 'lucide-react';
 
 const StudentPortal = () => {
-  // Login & Data States
+  const { id } = useParams(); // Magic Link ID
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [data, setData] = useState(null);
   const [menu, setMenu] = useState(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(!!id); 
   const [isEditing, setIsEditing] = useState(false);
 
-  // Edit Form States
   const [editForm, setEditForm] = useState({
-    address: '', 
-    emergencyContact: '', 
-    profilePic: '', 
-    email: ''
+    address: '', emergencyContact: '', profilePic: '', email: ''
   });
 
   const todayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date().getDay()];
 
-  // 1. Login Function
+  // 1. Magic Link Auto Login
+  useEffect(() => {
+    if (id) {
+      const fetchDirect = async () => {
+        try {
+          const res = await API.get(`/students/portal-direct/${id}`);
+          setupPortal(res.data);
+        } catch (err) { setLoading(false); }
+      };
+      fetchDirect();
+    }
+  }, [id]);
+
+  const setupPortal = async (portalData) => {
+    setData(portalData);
+    setEditForm({
+      address: portalData.student.address || '',
+      emergencyContact: portalData.student.emergencyContact || '',
+      profilePic: portalData.student.profilePic || '',
+      email: portalData.student.email || ''
+    });
+    try {
+      const menuRes = await fetchMenu();
+      const todayMenu = menuRes.data.find(m => m.day === todayName);
+      setMenu(todayMenu);
+    } catch (mErr) { console.log("Menu load failed"); }
+    setLoading(false);
+  };
+
+  // 2. Manual Login
   const handleLogin = async () => {
     if(!phone || !password) return alert("fill-up both phone no and pin!");
     try {
+      setLoading(true);
       const res = await loginStudent({ phone, password });
-      setData(res.data);
-      
-      // Initializing Edit Form
-      setEditForm({
-        address: res.data.student.address || '',
-        emergencyContact: res.data.student.emergencyContact || '',
-        profilePic: res.data.student.profilePic || '',
-        email: res.data.student.email || ''
-      });
-
-      // Fetch Menu
-      try {
-        const menuRes = await fetchMenu();
-        const todayMenu = menuRes.data.find(m => m.day === todayName);
-        setMenu(todayMenu);
-      } catch (mErr) { console.log("Menu load failed"); }
-
-      setError('');
+      setupPortal(res.data);
     } catch (err) {
-      setError(err.response?.data?.msg || "Ghalat Number ya PIN!");
+      setLoading(false);
+      setError("Ghalat Number ya PIN!");
     }
   };
 
-  // 2. Image Selection & Preview Logic
+  // 3. Profile Update (With 300kb limit)
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 300000) { 
-      alert(" image is to larger! please choose 300kb maxim  (Passport size).");
-      e.target.value = ""; 
-      return;
-    }
-
+        alert("image is to larger! please choose 300kb maxim (Passport size).");
+        e.target.value = ""; return;
+      }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditForm({ ...editForm, profilePic: reader.result });
-      };
+      reader.onloadend = () => setEditForm({ ...editForm, profilePic: reader.result });
       reader.readAsDataURL(file);
     }
   };
 
-  // 3. Final Profile Update Function
   const handleUpdate = async () => {
     try {
       const res = await updateStudentProfile(data.student._id, editForm);
-    console.log("Updated Data from DB:", res.data);
       setData({ ...data, student: res.data });
-    
-      setEditForm({
-        address: res.data.address || '',
-        emergencyContact: res.data.emergencyContact || '',
-        profilePic: res.data.profilePic || '',
-        email: res.data.email || ''
-      });
       setIsEditing(false);
       alert("Profile updated successfully! ✨");
-    } catch (err) {
-      alert("Update failed! please try again letter.");
-    }
+    } catch (err) { alert("Update failed!"); }
   };
 
-  // Login Screen
+  // --- RENDERING ---
+
+  if (loading) return (
+    <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <Loader2 size={40} className="spinning" color="#ff9800" />
+      <style>{`.spinning { animation: rotate 1s linear infinite; } @keyframes rotate { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
   if (!data) return (
-    <div style={{ padding: '40px 20px', maxWidth: '400px', margin: 'auto', textAlign: 'center', fontFamily: 'Arial' }}>
+    <div style={{ padding: '40px 20px', maxWidth: '400px', margin: 'auto', textAlign: 'center' }}>
       <div style={{ background: '#fff', padding: '30px', borderRadius: '15px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
         <h2 style={{ color: '#333', marginBottom: '20px' }}>Student Login</h2>
-        <input type="text" placeholder="Phone Number" style={inputStyle} onChange={(e) => setPhone(e.target.value)} />
-        <input type="password" placeholder="PIN" style={inputStyle} onChange={(e) => setPassword(e.target.value)} />
+        <input type="text" placeholder="Phone" style={inputStyle} onChange={e => setPhone(e.target.value)} />
+        <input type="password" placeholder="PIN" style={inputStyle} onChange={e => setPassword(e.target.value)} />
         <button onClick={handleLogin} style={btnStyle}>Login to Portal</button>
         {error && <p style={{ color: 'red', marginTop: '15px' }}>{error}</p>}
       </div>
@@ -119,14 +124,8 @@ const StudentPortal = () => {
       <div style={cardStyle('#fff', '1px solid #ddd')}>
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           <div style={{ position: 'relative' }}>
-            <img 
-              src={(isEditing ? editForm.profilePic : data.student.profilePic) || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"} 
-              alt="Profile"
-              style={{ width: '80px', height: '80px', borderRadius: '50%', border: '3px solid #333', objectFit: 'cover' }} 
-            />
-            {!isEditing && (
-              <button onClick={() => setIsEditing(true)} style={editIconStyle}><Camera size={14}/></button>
-            )}
+            <img src={data.student.profilePic || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"} style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #333' }} />
+            {!isEditing && <button onClick={() => setIsEditing(true)} style={editIconStyle}><Camera size={14}/></button>}
           </div>
           <div>
             <h3 style={{ margin: 0 }}>{data.student.name}</h3>
@@ -135,29 +134,22 @@ const StudentPortal = () => {
         </div>
 
         {isEditing ? (
-          <div style={{ marginTop: '20px', background: '#f9f9f9', padding: '15px', borderRadius: '10px' }}>
-            <label style={labelStyle}>Change Profile Photo</label>
-            <input type="file" accept="image/*" onChange={handleImageChange} style={inputStyle} />
-            
-            <label style={labelStyle}>Email</label>
-            <input style={inputStyle} value={editForm.email} onChange={e => setEditForm({...editForm, email:e.target.value})} />
-            
-            <label style={labelStyle}>Address (Room No)</label>
-            <input style={inputStyle} value={editForm.address} onChange={e => setEditForm({...editForm, address:e.target.value})} />
-            
-            <label style={labelStyle}>Emergency Contact</label>
-            <input style={inputStyle} value={editForm.emergencyContact} onChange={e => setEditForm({...editForm, emergencyContact:e.target.value})} />
-            
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <button onClick={handleUpdate} style={{ ...btnStyle, background: '#2e7d32', flex: 1 }}><Save size={16}/> Save</button>
-              <button onClick={() => setIsEditing(false)} style={{ ...btnStyle, background: '#666', flex: 1 }}><XCircle size={16}/> Cancel</button>
+          <div style={{ marginTop: '20px' }}>
+            <label style={labelStyle}>Change Photo (Max 300kb)</label>
+            <input type="file" onChange={handleImageChange} style={inputStyle} />
+            <input style={inputStyle} value={editForm.email} placeholder="Email" onChange={e => setEditForm({...editForm, email:e.target.value})} />
+            <input style={inputStyle} value={editForm.address} placeholder="Room No" onChange={e => setEditForm({...editForm, address:e.target.value})} />
+            <input style={inputStyle} value={editForm.emergencyContact} placeholder="Emergency Contact" onChange={e => setEditForm({...editForm, emergencyContact:e.target.value})} />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handleUpdate} style={{ ...btnStyle, background: '#2e7d32' }}>Save</button>
+              <button onClick={() => setIsEditing(false)} style={{ ...btnStyle, background: '#666' }}>Cancel</button>
             </div>
           </div>
         ) : (
-          <div style={{ marginTop: '15px', fontSize: '14px', color: '#444', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-            <p style={infoRow}><Mail size={14} color="#666"/> {data.student.email || 'Email set karein'}</p>
-            <p style={infoRow}><MapPin size={14} color="#666"/> {data.student.address || 'Address set karein'}</p>
-            <p style={infoRow}><PhoneCall size={14} color="#666"/> {data.student.emergencyContact || 'Emergency Contact'}</p>
+          <div style={{ marginTop: '15px', fontSize: '14px' }}>
+            <p style={infoRow}><Mail size={14}/> {data.student.email || 'No Email'}</p>
+            <p style={infoRow}><MapPin size={14}/> {data.student.address || 'No Address'}</p>
+            <p style={infoRow}><PhoneCall size={14}/> {data.student.emergencyContact || 'No Emergency Contact'}</p>
           </div>
         )}
       </div>
@@ -165,59 +157,36 @@ const StudentPortal = () => {
       {/* 💰 BILL CARD */}
       <div style={cardStyle('#333', 'none')}>
          <h4 style={{ color: '#ff9800', margin: 0 }}>Total Bill Due</h4>
-         <h1 style={{ color: '#fff', margin: '10px 0', fontSize: '32px' }}>₹{data.student.totalDue}</h1>
-         <p style={{ color: '#bbb', fontSize: '12px', margin: 0 }}>Kripya samay par payment karein.</p>
+         <h1 style={{ color: '#fff', fontSize: '32px', margin: '10px 0' }}>₹{data.student.totalDue}</h1>
+         <p style={{ color: '#bbb', fontSize: '12px' }}>Samay par payment karein.</p>
       </div>
 
-      {/* 📅 ATTENDANCE HISTORY */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0 10px' }}>
-        <Calendar size={18} /> <h3 style={{ margin: 0 }}>Attendance Record</h3>
-      </div>
-
-      <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-        {data.attendance.map((h, i) => (
-          <div key={i} style={historyItemStyle}>
-             <span style={{ fontSize: '14px' }}>{new Date(h.date).toLocaleDateString('en-GB')}</span>
-             <div style={{ display: 'flex', gap: '8px' }}>
-                {h.breakfast && <span style={mealTag('#fff3e0', '#ff9800')}>B</span>}
-                {h.lunch && <span style={mealTag('#e8f5e9', '#2e7d32')}>L</span>}
-                {h.dinner && <span style={mealTag('#e8eaf6', '#3f51b5')}>D</span>}
+      {/* 📅 ATTENDANCE */}
+      <div style={{ margin: '20px 0' }}>
+         <Calendar size={18} /> <h3 style={{ display: 'inline', marginLeft: '10px' }}>Attendance History</h3>
+         <div style={{ marginTop: '10px' }}>
+           {data.attendance.map((h, i) => (
+             <div key={i} style={historyItemStyle}>
+               <span>{new Date(h.date).toLocaleDateString('en-GB')}</span>
+               <div style={{ display: 'flex', gap: '5px' }}>
+                  {h.breakfast && <span style={mealTag('#fff3e0', '#ff9800')}>B</span>}
+                  {h.lunch && <span style={mealTag('#e8f5e9', '#2e7d32')}>L</span>}
+                  {h.dinner && <span style={mealTag('#e8eaf6', '#3f51b5')}>D</span>}
+               </div>
              </div>
-          </div>
-        ))}
+           ))}
+         </div>
       </div>
-      
-      <button onClick={() => window.location.reload()} style={{ marginTop: '30px', width: '100%', padding: '12px', background: '#f44336', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>
+
+      <button onClick={() => window.location.replace('/my-portal')} style={{ width: '100%', padding: '12px', background: '#f44336', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>
         <LogOut size={18}/> Logout
       </button>
 
       {/* ── FOOTER ── */}
-      <div style={{
-        marginTop: '24px',
-        borderTop: '1px solid #ddd',
-        paddingTop: '16px',
-        paddingBottom: '20px',
-        textAlign: 'center',
-        fontFamily: 'Arial'
-      }}>
-        <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#555' }}>
-          Developed by <span style={{ color: '#ff9800', fontWeight: 'bold' }}>Jivan</span>
-        </p>
-        <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#777' }}>
-          Any query? Contact us:
-        </p>
-        <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#555' }}>
-          📞 <a href="tel:6267216334" style={{ color: '#333', textDecoration: 'none' }}>6267216334</a>
-          {'  |  '}
-          ✉ <a href="mailto:jivankarsh87@gmail.com" style={{ color: '#333', textDecoration: 'none' }}>jivankarsh87@gmail.com</a>
-        </p>
-        <p style={{ margin: '10px 0 0', fontSize: '11px', color: '#aaa' }}>
-          <a href="/privacy-policy" style={{ color: '#ff9800', textDecoration: 'underline' }}>Privacy Policy</a>
-          {'  ·  '}
-          © {new Date().getFullYear()} Jivan. All rights reserved.
-        </p>
+      <div style={{ marginTop: '30px', borderTop: '1px solid #ddd', paddingTop: '15px', textAlign: 'center' }}>
+        <p style={{ fontSize: '13px', margin: '0' }}>Developed by <span style={{ color: '#ff9800', fontWeight: 'bold' }}>Jivan</span></p>
+        <p style={{ fontSize: '12px', color: '#666' }}>📞 6267216334 | ✉ jivankarsh87@gmail.com</p>
       </div>
-      {/* ── END FOOTER ── */}
 
     </div>
   );
@@ -226,11 +195,11 @@ const StudentPortal = () => {
 // Styles
 const cardStyle = (bg, border) => ({ background: bg, border, padding: '20px', borderRadius: '15px', marginBottom: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' });
 const inputStyle = { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' };
-const labelStyle = { fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px', textAlign: 'left' };
-const btnStyle = { width: '100%', padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: 'bold' };
-const editIconStyle = { position: 'absolute', bottom: 0, right: 0, background: '#ff9800', color: '#fff', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer' };
-const historyItemStyle = { display: 'flex', justifyContent: 'space-between', padding: '12px 15px', background: '#fff', borderRadius: '10px', marginBottom: '8px' };
+const labelStyle = { fontSize: '11px', color: '#888', textAlign: 'left', display: 'block' };
+const btnStyle = { width: '100%', padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' };
+const editIconStyle = { position: 'absolute', bottom: 0, right: 0, background: '#ff9800', color: '#fff', border: 'none', borderRadius: '50%', padding: '6px' };
 const infoRow = { display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' };
+const historyItemStyle = { display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#fff', borderRadius: '10px', marginBottom: '8px' };
 const mealTag = (bg, color) => ({ background: bg, color: color, padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' });
 
 export default StudentPortal;
