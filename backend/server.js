@@ -12,20 +12,17 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("Didi's Mess Database Connected! ✅"))
     .catch((err) => console.log("DB Connection Error: ", err));
 
-    // 3. Environment Variables
+// 3. Environment Variables
 const ADMIN_PIN = process.env.ADMIN_PIN;
 
 // 2. Middleware 
 app.use(cors());
-
-
 app.use(express.json({ limit: '1mb' })); 
 app.use(express.urlencoded({ limit: '1mb', extended: true }));
-// 5. Authentication Middleware (Using Secure PIN from .env)
+
+// 5. Authentication Middleware
 const authAdmin = (req, res, next) => {
     const pin = req.headers['admin-pin'];
-    
-   
     if (pin === ADMIN_PIN) { 
         next(); 
     } else {
@@ -38,13 +35,11 @@ const Student = require('./models/Student');
 const Attendance = require('./models/Attendance');
 const Menu = require('./models/Menu');
 
-
 // 4. Routes Import
 const studentRoutes = require('./routes/studentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const menuRoutes = require('./routes/menuRoutes');
-
 const sendMail = require('./utils/emailSender');
 
 // 5. Routes Link karein
@@ -57,15 +52,28 @@ app.use('/api/menu/update', authAdmin);
 // --- DIRECT ROUTES (Special Logic) ---
 // ============================================================
 
-// 1. STUDENT PORTAL LOGIN (Direct for 100% Success)
+// [NAYA FEATURE] - DIRECT PORTAL ACCESS BINA PASSWORD KE
+app.get('/api/students/portal-direct/:id', async (req, res) => {
+    try {
+        const student = await Student.findById(req.params.id);
+        if (!student) {
+            return res.status(404).json({ msg: "Student nahi mila!" });
+        }
+        // Attendance fetch karein
+        const attendance = await Attendance.find({ studentId: student._id }).sort({ date: -1 });
+        res.json({ student, attendance });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 1. STUDENT PORTAL LOGIN (Purana Password wala logic)
 app.post('/api/students/portal-login', async (req, res) => {
     try {
-         const phone = String(req.body.phone);
+        const phone = String(req.body.phone);
         const password = String(req.body.password);
-
-       
-      const student = await Student.findOne({ phone, password });
         
+        const student = await Student.findOne({ phone, password });
         if (!student) {
             return res.status(401).json({ msg: "Ghalat Number ya Password!" });
         }
@@ -95,7 +103,7 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
 
         if (record[mealType]) {
             record[mealType] = false;
-             student.totalDue = Math.max(0, (student.totalDue || 0) - rates[mealType]);
+            student.totalDue = Math.max(0, (student.totalDue || 0) - rates[mealType]);
         } else {
             record[mealType] = true;
             student.totalDue = (student.totalDue || 0) + rates[mealType];
@@ -119,11 +127,10 @@ app.get('/api/attendance/status/:date', async (req, res) => {
     }
 });
 
-//email sender //
+// Email sender
 app.post('/api/students/send-email-reminder', async (req, res) => {
     try {
         const { email, name, amount } = req.body;
-
         if (!email) return res.status(400).json({ msg: "Email missing!" });
 
         const subject = `Payment Reminder: Didi's Mess`;
@@ -136,10 +143,9 @@ app.post('/api/students/send-email-reminder', async (req, res) => {
     }
 });
 
-// 4. PAYMENT ALERTS LOGIC
+// 4. PAYMENT ALERTS LOGIC (27 Din wala logic same hai)
 app.get('/api/students/alerts', async (req, res) => {
     try {
-        const Student = require('./models/Student');
         const allStudents = await Student.find({});
         const today = new Date();
 
@@ -156,7 +162,7 @@ app.get('/api/students/alerts', async (req, res) => {
                 totalDue: s.totalDue,
                 daysPassed: diffDays || 0
             };
-        }).filter(s => s.daysPassed >= 27); // 🔥 SIRF 27 DIN SE PURANE BACHE DIKHENGE
+        }).filter(s => s.daysPassed >= 27); 
 
         res.json(alerts);
     } catch (err) {
@@ -164,16 +170,10 @@ app.get('/api/students/alerts', async (req, res) => {
     }
 });
 
-
-/// --- 📄 BILL SUMMARY FOR PDF (server.js mein add karein) ---
-
+// BILL SUMMARY FOR PDF
 app.get('/api/students/bill-summary/:id', async (req, res) => {
     try {
-        const Attendance = require('./models/Attendance');
-        // Us student ke saare records date ke bina dhoondo
         const records = await Attendance.find({ studentId: req.params.id });
-        
-        // Filter lagao
         const summary = {
             breakfast: records.filter(r => r.breakfast === true).length,
             lunch: records.filter(r => r.lunch === true).length,
@@ -185,81 +185,54 @@ app.get('/api/students/bill-summary/:id', async (req, res) => {
     }
 });
 
-
-
-// --- 🚀 MARK ALL MEALS (Super Safe Version) ---
+// MARK ALL MEALS
 app.post('/api/attendance/mark-all', async (req, res) => {
     try {
         const { date, mealType } = req.body; 
         const rates = { breakfast: 25, lunch: 50, dinner: 50 };
 
-        console.log(`Marking all for: ${date}, Meal: ${mealType}`);
-
-        // Models ko sahi se pakdo (Check if they are already imported at top)
-        const StudentModel = mongoose.model('Student');
-        const AttendanceModel = mongoose.model('Attendance');
-
-        const students = await StudentModel.find();
-        
+        const students = await Student.find();
         if (!students || students.length === 0) {
             return res.status(404).json({ msg: "No students found to mark" });
         }
 
-        // Saare students par loop chalao
         for (let student of students) {
-            let record = await AttendanceModel.findOne({ studentId: student._id, date: date });
-            
-            if (!record) {
-                record = new AttendanceModel({ studentId: student._id, date: date });
-            }
+            let record = await Attendance.findOne({ studentId: student._id, date: date });
+            if (!record) record = new Attendance({ studentId: student._id, date: date });
 
-            // Sirf tabhi paisa jodo agar pehle se wo meal tick NAHI hai
             if (record[mealType] !== true) {
                 record[mealType] = true;
                 student.totalDue = (student.totalDue || 0) + rates[mealType];
-                
                 await record.save();
                 await student.save();
             }
         }
-
         res.json({ msg: "Success! Sabka attendance lag gaya." });
     } catch (err) {
-        console.error("CRASH ERROR IN MARK-ALL:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- 🤖 PRODUCTION AUTO-EMAIL (Har Roz Subah 10 Baje) ---
-
+// AUTO-EMAIL CRON
 cron.schedule('0 10 * * *', async () => {
     try {
-        const Student = require('./models/Student');
         const students = await Student.find({});
         const today = new Date();
-
         for (let student of students) {
             const startDate = new Date(student.lastPaymentDate || student.joiningDate);
             const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
-
-         
             if ((diffDays === 28 || diffDays === 30) && student.email) {
                 const subject = `Mess Renewal Alert: ${student.name}`;
                 const htmlContent = `<h2>Namaste ${student.name}</h2><p>Aapka mess mahina pura hone wala hai (${diffDays} din ho gaye). Bill: ₹${student.totalDue}</p>`;
-                
                 await sendMail(student.email, subject, htmlContent);
             }
         }
     } catch (err) { console.log(err); }
 });
 
-
-// --- 🥗 SMART MENU DIRECT ROUTES (server.js mein add karein) ---
-
-// 1. Saara menu dekhne ke liye (GET)
+// SMART MENU ROUTES
 app.get('/api/menu', async (req, res) => {
     try {
-        const Menu = require('./models/Menu'); // Model import
         const menuData = await Menu.find();
         res.json(menuData);
     } catch (err) {
@@ -267,15 +240,11 @@ app.get('/api/menu', async (req, res) => {
     }
 });
 
-// 2. Menu update karne ke liye (POST)
 app.post('/api/menu/update', async (req, res) => {
     try {
         const { day, dish, ingredients } = req.body;
-        const Menu = require('./models/Menu');
         const updated = await Menu.findOneAndUpdate(
-            { day }, 
-            { dish, ingredients }, 
-            { upsert: true, new: true }
+            { day }, { dish, ingredients }, { upsert: true, new: true }
         );
         res.json(updated);
     } catch (err) {
@@ -283,55 +252,34 @@ app.post('/api/menu/update', async (req, res) => {
     }
 });
 
-//user profile //
+// UPDATE PROFILE
 app.put('/api/students/update-profile/:id', async (req, res) => {
     try {
         const { address, emergencyContact, profilePic, email } = req.body;
-        const Student = require('./models/Student');
-        
         const updatedStudent = await Student.findByIdAndUpdate(
             req.params.id, 
             { address, emergencyContact, profilePic, email }, 
             { new: true }
         );
-        
         res.json(updatedStudent);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- 🗑️ DELETE STUDENT DIRECT ROUTE ---
+// DELETE STUDENT
 app.delete('/api/students/:id', async (req, res) => {
     try {
-        const Student = require('./models/Student');
-        const Attendance = require('./models/Attendance');
-
-    
         const deletedStudent = await Student.findByIdAndDelete(req.params.id);
-        
-        if (!deletedStudent) {
-            return res.status(404).json({ msg: "Student nahi mila" });
-        }
-
-       
+        if (!deletedStudent) return res.status(404).json({ msg: "Student nahi mila" });
         await Attendance.deleteMany({ studentId: req.params.id });
-
         res.json({ msg: "Student aur uska data delete ho gaya!" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
-// 5. TEST ROUTE
+
 app.get('/test', (req, res) => res.send("Server is Working Perfectly!"));
-
-// ============================================================
-// --- DATABASE & SERVER START ---
-// ============================================================
-
-mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log("✅ MongoDB Connected"))
-.catch(err => console.log("❌ DB Error", err));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server started on port ${PORT}`));

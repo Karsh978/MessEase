@@ -148,6 +148,7 @@ function App() {
             />
             
             {/* 🔓 Public Route: Student Portal hamesha open rahega */}
+            <Route path="/my-portal/:id" element={<StudentPortal />} />
             <Route path="/my-portal" element={<StudentPortal />} />
             
             {/* Redirect for any unknown URL */}
