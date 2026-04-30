@@ -1,322 +1,337 @@
-import React, { useState, useEffect } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone } from 'lucide-react';
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
-import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const cron = require('node-cron');
 
-const getInitials = (name = '') =>
-  name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+// 1. Sabse pehle Config aur App shuru karein
+dotenv.config();
+const app = express();
 
-const S = {
-  navy:        '#1B3A6B',
-  navyBg:      '#EEF2FA',
-  navyBorder:  '#C6D4ED',
-  green:       '#1E7E4A',
-  greenBg:     '#EAF5EF',
-  red:         '#C0392B',
-  redBg:       '#FDECEA',
-  amber:       '#8B6200',
-  amberBg:     '#FFF8E7',
-  amberBorder: '#F5D78E',
-  border:      '#E8ECF4',
-  pageBg:      '#F0F4FF',
-  white:       '#FFFFFF',
-  text:        '#1A1A2E',
-  muted:       '#8A95B0',
-  blue:        '#2196F3',
-  blueBg:      '#E3F2FD'
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("Didi's Mess Database Connected! ✅"))
+    .catch((err) => console.log("DB Connection Error: ", err));
+
+    // 3. Environment Variables
+const ADMIN_PIN = process.env.ADMIN_PIN;
+
+// 2. Middleware 
+app.use(cors());
+
+
+app.use(express.json({ limit: '1mb' })); 
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
+// 5. Authentication Middleware (Using Secure PIN from .env)
+const authAdmin = (req, res, next) => {
+    const pin = req.headers['admin-pin'];
+    
+   
+    if (pin === ADMIN_PIN) { 
+        next(); 
+    } else {
+        res.status(401).json({ msg: "Unauthorized! Ghalat PIN." });
+    }
 };
 
-const Dashboard = () => {
-  const [students, setStudents]     = useState([]);
-  const [expenses, setExpenses]     = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [alerts, setAlerts]         = useState([]);
-  const [loading, setLoading]       = useState(true);
+// 3. Models Import
+const Student = require('./models/Student');
+const Attendance = require('./models/Attendance');
+const Menu = require('./models/Menu');
 
-  const [name, setName]           = useState('');
-  const [phone, setPhone]         = useState('');
-  const [email, setEmail]         = useState('');
-  const [password, setPassword]   = useState('1234');
-  const [dailyRate, setDailyRate] = useState(0);
 
-  const today = new Date();
-  const [viewMonth, setViewMonth]     = useState(today.getMonth());
-  const [viewYear, setViewYear]       = useState(today.getFullYear());
-  const [allDaysMode, setAllDaysMode] = useState(false); // ✅ NEW
+// 4. Routes Import
+const studentRoutes = require('./routes/studentRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
+const expenseRoutes = require('./routes/expenseRoutes');
+const menuRoutes = require('./routes/menuRoutes');
 
-  const months = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December"
-  ];
+const sendMail = require('./utils/emailSender');
 
-  useEffect(() => {
-    const initLoad = async () => {
-      setLoading(true);
-      await Promise.all([loadData(), getAlerts()]);
-      setLoading(false);
-    };
-    initLoad();
-  }, []);
+// 5. Routes Link karein
+app.use('/api/students', studentRoutes);
+app.use('/api/attendance', authAdmin, attendanceRoutes); 
+app.use('/api/expenses', authAdmin, expenseRoutes);    
+app.use('/api/menu/update', authAdmin);                
 
-  const getAlerts = async () => {
-    try { const res = await fetchAlerts(); setAlerts(res.data || []); }
-    catch (err) { console.log("Alert fetch error"); }
-  };
+// ============================================================
+// --- DIRECT ROUTES (Special Logic) ---
+// ============================================================
 
-  const loadData = async () => {
+// 1. STUDENT PORTAL LOGIN (Direct for 100% Success)
+app.post('/api/students/portal-login', async (req, res) => {
     try {
-      const sRes = await fetchStudents();
-      const eRes = await fetchExpenses();
-      setStudents(sRes.data || []);
-      setExpenses(eRes.data || []);
-    } catch (err) { console.log("Data load error"); }
-  };
+         const phone = String(req.body.phone);
+        const password = String(req.body.password);
 
-  const sendWelcomeMessage = (student) => {
-    const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`;
-    const msg = `Namaste ${student.name}! 🙏\nDidi's Mess mein aapka swagat hai. 🍱\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\n🔗 Link: ${portalURL}\n\n📱 Login ID: ${student.phone}\n🔑 Aapka PIN: ${student.password || '1234'}\n\nKripya is link ko save kar lein. Dhanyawad! ✨`;
-    window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
-  };
+       
+      const student = await Student.findOne({ phone, password });
+        
+        if (!student) {
+            return res.status(401).json({ msg: "Ghalat Number ya Password!" });
+        }
 
-  const handleEmailReminder = async (student) => {
-    if (!student.email) return alert("email not found!");
-    try {
-      await API.post('/students/send-email-reminder', {
-        email: student.email,
-        name: student.name,
-        totalDue: student.totalDue
-      });
-      alert(`Email sent to ${student.name}!`);
-    } catch (err) { alert("Email error!"); }
-  };
-
-  const downloadBill = async (student) => {
-    try {
-      const res = await API.get(`/students/bill-summary/${student._id}`);
-      const data = res.data;
-      const doc = new jsPDF();
-      doc.setFontSize(20);
-      doc.text("DIDI'S MESS RECEIPT", 15, 20);
-      doc.setFontSize(10);
-      doc.text(`Student: ${student.name}`, 15, 30);
-      doc.text(`Total Due: RS ${student.totalDue}`, 15, 40);
-      autoTable(doc, {
-        startY: 50,
-        head: [['Meal', 'Days', 'Rate', 'Total']],
-        body: [
-          ['Breakfast', data.breakfast || 0, '25', (data.breakfast || 0) * 25],
-          ['Lunch',     data.lunch     || 0, '50', (data.lunch     || 0) * 50],
-          ['Dinner',    data.dinner    || 0, '50', (data.dinner    || 0) * 50],
-          [{ content: 'Grand Total', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } }, student.totalDue],
-        ],
-        theme: 'grid',
-        headStyles: { fillColor: [27, 58, 107] },
-      });
-      doc.save(`Bill_${student.name}.pdf`);
-    } catch (err) { alert("PDF Error!"); }
-  };
-
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    try {
-      await addStudent({ name, phone, email, password, dailyRate });
-      setName(''); setPhone(''); setEmail(''); setPassword('1234'); setDailyRate(100);
-      loadData(); getAlerts();
-      alert("Student registered!");
-    } catch (err) { alert("Registration failed!"); }
-  };
-
-  const handlePay = async (id) => {
-    if (window.confirm("Payment receive ho gayi? bill zero ho jayega.")) {
-      try { await payFees(id); loadData(); getAlerts(); }
-      catch (err) { alert("Payment error!"); }
+        const attendance = await Attendance.find({ studentId: student._id }).sort({ date: -1 });
+        res.json({ student, attendance });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-  };
+});
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Kya delete karna chahti hain? Saara data khatam ho jayega.")) {
-      try { await deleteStudent(id); loadData(); getAlerts(); }
-      catch (err) { alert("Delete error!"); }
+// 2. 3-MEAL ATTENDANCE TOGGLE
+app.post('/api/attendance/toggle-meal', async (req, res) => {
+    try {
+        const { studentId, date, mealType } = req.body;
+        const rates = { breakfast: 25, lunch: 50, dinner: 50 };
+
+        if (!studentId || !date || !mealType) {
+            return res.status(400).json({ msg: "Missing data" });
+        }
+
+        let record = await Attendance.findOne({ studentId, date });
+        if (!record) record = new Attendance({ studentId, date });
+
+        const student = await Student.findById(studentId);
+        if (!student) return res.status(404).json({ msg: "Student not found" });
+
+        if (record[mealType]) {
+            record[mealType] = false;
+             student.totalDue = Math.max(0, (student.totalDue || 0) - rates[mealType]);
+        } else {
+            record[mealType] = true;
+            student.totalDue = (student.totalDue || 0) + rates[mealType];
+        }
+
+        await record.save();
+        await student.save();
+        res.json({ msg: "Success", record, totalDue: student.totalDue });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-  };
+});
 
-  const handleCall = (phoneNumber) => {
-    window.location.href = `tel:${phoneNumber}`;
-  };
+// 3. ATTENDANCE STATUS CHECK
+app.get('/api/attendance/status/:date', async (req, res) => {
+    try {
+        const records = await Attendance.find({ date: req.params.date });
+        res.json(records);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
-  const filteredExpenses = expenses.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-  });
+//email sender //
+app.post('/api/students/send-email-reminder', async (req, res) => {
+    try {
+        const { email, name, amount } = req.body;
 
-  const totalExp     = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
-  const netProfit    = totalRevenue - totalExp;
+        if (!email) return res.status(400).json({ msg: "Email missing!" });
 
-  const filteredStudents = students.filter(s =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+        const subject = `Payment Reminder: Didi's Mess`;
+        const text = `Namaste ${name},\n\nAapka mess bill ₹${amount} due hai. Kripya samay par bhugtan karein.\n\nShukriya!\nDidi's Mess Management`;
 
-  const inp = { width: '100%', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${S.border}`, fontSize: 14, color: S.text, background: '#F8FAFF', outline: 'none', marginBottom: 10, boxSizing: 'border-box' };
+        await sendMail(email, subject, text);
+        res.json({ msg: "Email sent successfully!" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
-  const ibtn = (variant) => {
-    const map = {
-      bill: { background: S.navyBg, color: S.navy },
-      link: { background: S.greenBg, color: S.green },
-      paid: { background: S.navy,    color: S.white },
-      call: { background: S.blueBg,  color: S.blue },
-    };
-    return { border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', ...map[variant] };
-  };
+// 4. PAYMENT ALERTS LOGIC
+app.get('/api/students/alerts', async (req, res) => {
+    try {
+        const Student = require('./models/Student');
+        const allStudents = await Student.find({});
+        const today = new Date();
 
-  const selectStyle = { padding: '10px', borderRadius: '8px', border: `1px solid ${S.border}`, flex: 1, background: S.white, fontSize: '13px', fontWeight: '600', color: S.navy };
+        const alerts = allStudents.map(s => {
+            const startDate = s.lastPaymentDate || s.joiningDate || today;
+            const diffTime = today - new Date(startDate);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+            
+            return {
+                _id: s._id,
+                name: s.name,
+                phone: s.phone,
+                email: s.email,
+                totalDue: s.totalDue,
+                daysPassed: diffDays || 0
+            };
+        }).filter(s => s.daysPassed >= 27); // 🔥 SIRF 27 DIN SE PURANE BACHE DIKHENGE
 
-  if (loading) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: S.pageBg }}>
-        <Loader2 size={50} color={S.navy} className="spinning-icon" />
-        <p style={{ marginTop: 15, color: S.navy, fontWeight: 600, fontSize: 16 }}>Didi's Mess loading...</p>
-        <style>{`.spinning-icon { animation: rotate 1s linear infinite; } @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
+        res.json(alerts);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
-  return (
-    <div style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
 
-      {/* TOP BAR — same as original */}
-      <div style={{ background: S.white, padding: '18px 16px 14px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ fontSize: 17, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
-        {alerts.length > 0 && <BellRing size={20} color="#ff9800" />}
-      </div>
+/// --- 📄 BILL SUMMARY FOR PDF (server.js mein add karein) ---
 
-      {/* ✅ MONTH SELECTOR — "All Days" option added, baaki same */}
-      <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>
-        <select
-          value={allDaysMode ? 'all' : viewMonth}
-          onChange={(e) => {
-            if (e.target.value === 'all') {
-              setAllDaysMode(true);
-            } else {
-              setAllDaysMode(false);
-              setViewMonth(parseInt(e.target.value));
+app.get('/api/students/bill-summary/:id', async (req, res) => {
+    try {
+        const Attendance = require('./models/Attendance');
+        // Us student ke saare records date ke bina dhoondo
+        const records = await Attendance.find({ studentId: req.params.id });
+        
+        // Filter lagao
+        const summary = {
+            breakfast: records.filter(r => r.breakfast === true).length,
+            lunch: records.filter(r => r.lunch === true).length,
+            dinner: records.filter(r => r.dinner === true).length
+        };
+        res.json(summary);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+
+// --- 🚀 MARK ALL MEALS (Super Safe Version) ---
+app.post('/api/attendance/mark-all', async (req, res) => {
+    try {
+        const { date, mealType } = req.body; 
+        const rates = { breakfast: 25, lunch: 50, dinner: 50 };
+
+        console.log(`Marking all for: ${date}, Meal: ${mealType}`);
+
+        // Models ko sahi se pakdo (Check if they are already imported at top)
+        const StudentModel = mongoose.model('Student');
+        const AttendanceModel = mongoose.model('Attendance');
+
+        const students = await StudentModel.find();
+        
+        if (!students || students.length === 0) {
+            return res.status(404).json({ msg: "No students found to mark" });
+        }
+
+        // Saare students par loop chalao
+        for (let student of students) {
+            let record = await AttendanceModel.findOne({ studentId: student._id, date: date });
+            
+            if (!record) {
+                record = new AttendanceModel({ studentId: student._id, date: date });
             }
-          }}
-          style={selectStyle}
-        >
-          <option value="all">📋 All Days</option>
-          {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
-        </select>
-        {!allDaysMode && (
-          <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} style={selectStyle}>
-            <option value="2025">2025</option>
-            <option value="2026">2026</option>
-          </select>
-        )}
-      </div>
 
-      {/* ✅ NEW: All Days mode mein joining dates panel */}
-      {allDaysMode && (
-        <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 14, padding: '12px', border: `1px solid ${S.navyBorder}` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>📅 Students Joining Dates</div>
-          {students.length === 0 && (
-            <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>
-          )}
-          {students.map(s => (
-            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 4px', borderBottom: `1px solid ${S.border}` }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: S.text }}>{s.name}</span>
-              <span style={{ fontSize: 12, color: S.muted }}>
-                {s.joiningDate
-                  ? new Date(s.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : s.createdAt
-                  ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : 'N/A'}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+            // Sirf tabhi paisa jodo agar pehle se wo meal tick NAHI hai
+            if (record[mealType] !== true) {
+                record[mealType] = true;
+                student.totalDue = (student.totalDue || 0) + rates[mealType];
+                
+                await record.save();
+                await student.save();
+            }
+        }
 
-      {/* STATS CARDS — same as original */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '0 12px 14px' }}>
-        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
-          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: S.green }}>₹{totalRevenue}</div>
-        </div>
-        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.red}` }}>
-          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Expense</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: S.red }}>₹{totalExp}</div>
-        </div>
-        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.navy}` }}>
-          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Profit</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: netProfit >= 0 ? S.green : S.red }}>₹{netProfit}</div>
-        </div>
-        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.blue}` }}>
-          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Students</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: S.blue }}>{students.length}</div>
-        </div>
-      </div>
+        res.json({ msg: "Success! Sabka attendance lag gaya." });
+    } catch (err) {
+        console.error("CRASH ERROR IN MARK-ALL:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
 
-      {/* ALERTS — same as original */}
-      {alerts.length > 0 && (
-        <div style={{ margin: '0 12px 14px', background: S.amberBg, borderRadius: 14, padding: '12px', border: `1px solid ${S.amberBorder}` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>⚠️ Payment Alerts ({alerts.length})</div>
-          {alerts.map(s => (
-            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: S.white, padding: '10px', borderRadius: 8, marginBottom: 5 }}>
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 600, display: 'block' }}>{s.name}</span>
-                <span style={{ fontSize: 10, color: S.red }}>{s.daysPassed} Days Overdue</span>
-              </div>
-              <button onClick={() => handleEmailReminder(s)} style={{ fontSize: 11, background: S.red, border: 'none', color: S.white, fontWeight: 700, padding: '5px 10px', borderRadius: 5 }}>Alert Email</button>
-            </div>
-          ))}
-        </div>
-      )}
+// --- 🤖 PRODUCTION AUTO-EMAIL (Har Roz Subah 10 Baje) ---
 
-      {/* REGISTER FORM — same as original */}
-      <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <UserPlus size={16} color={S.navy}/> New Registration
-        </div>
-        <form onSubmit={handleAdd}>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Student name" required style={inp} />
-          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number (Login ID)" required style={inp} />
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email ID (for alerts)" style={inp} />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" required style={inp} />
-          <button type="submit" style={{ width: '100%', padding: 12, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>
-            Register Student
-          </button>
-        </form>
-      </div>
+cron.schedule('0 10 * * *', async () => {
+    try {
+        const Student = require('./models/Student');
+        const students = await Student.find({});
+        const today = new Date();
 
-      {/* SEARCH — same as original */}
-      <div style={{ padding: '0 12px 15px' }}>
-        <input type="text" placeholder="🔍 Search students..." style={{ ...inp, borderRadius: 25, marginBottom: 0 }} onChange={e => setSearchTerm(e.target.value)} />
-      </div>
+        for (let student of students) {
+            const startDate = new Date(student.lastPaymentDate || student.joiningDate);
+            const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
 
-      {/* STUDENT LIST — same as original */}
-      <div style={{ padding: '0 12px' }}>
-        {filteredStudents.map(s => (
-          <div key={s._id} style={{ background: S.white, borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${S.border}`, borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}` }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{getInitials(s.name)}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{s.name}</div>
-              <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
-            </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => handleCall(s.phone)} style={ibtn('call')}><Phone size={14}/></button>
-              <button onClick={() => downloadBill(s)} style={ibtn('bill')}><Download size={14} /></button>
-              <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')}><MessageCircle size={14} /></button>
-              <button onClick={() => handlePay(s._id)} style={ibtn('paid')}>Paid</button>
-              <button onClick={() => handleDelete(s._id)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 7 }}><Trash2 size={14}/></button>
-            </div>
-          </div>
-        ))}
-      </div>
+         
+            if ((diffDays === 28 || diffDays === 30) && student.email) {
+                const subject = `Mess Renewal Alert: ${student.name}`;
+                const htmlContent = `<h2>Namaste ${student.name}</h2><p>Aapka mess mahina pura hone wala hai (${diffDays} din ho gaye). Bill: ₹${student.totalDue}</p>`;
+                
+                await sendMail(student.email, subject, htmlContent);
+            }
+        }
+    } catch (err) { console.log(err); }
+});
 
-    </div>
-  );
-};
 
-export default Dashboard;
+// --- 🥗 SMART MENU DIRECT ROUTES (server.js mein add karein) ---
+
+// 1. Saara menu dekhne ke liye (GET)
+app.get('/api/menu', async (req, res) => {
+    try {
+        const Menu = require('./models/Menu'); // Model import
+        const menuData = await Menu.find();
+        res.json(menuData);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Menu update karne ke liye (POST)
+app.post('/api/menu/update', async (req, res) => {
+    try {
+        const { day, dish, ingredients } = req.body;
+        const Menu = require('./models/Menu');
+        const updated = await Menu.findOneAndUpdate(
+            { day }, 
+            { dish, ingredients }, 
+            { upsert: true, new: true }
+        );
+        res.json(updated);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+//user profile //
+app.put('/api/students/update-profile/:id', async (req, res) => {
+    try {
+        const { address, emergencyContact, profilePic, email } = req.body;
+        const Student = require('./models/Student');
+        
+        const updatedStudent = await Student.findByIdAndUpdate(
+            req.params.id, 
+            { address, emergencyContact, profilePic, email }, 
+            { new: true }
+        );
+        
+        res.json(updatedStudent);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- 🗑️ DELETE STUDENT DIRECT ROUTE ---
+app.delete('/api/students/:id', async (req, res) => {
+    try {
+        const Student = require('./models/Student');
+        const Attendance = require('./models/Attendance');
+
+    
+        const deletedStudent = await Student.findByIdAndDelete(req.params.id);
+        
+        if (!deletedStudent) {
+            return res.status(404).json({ msg: "Student nahi mila" });
+        }
+
+       
+        await Attendance.deleteMany({ studentId: req.params.id });
+
+        res.json({ msg: "Student aur uska data delete ho gaya!" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// 5. TEST ROUTE
+app.get('/test', (req, res) => res.send("Server is Working Perfectly!"));
+
+// ============================================================
+// --- DATABASE & SERVER START ---
+// ============================================================
+
+mongoose.connect(process.env.MONGO_URI)
+.then(() => console.log("✅ MongoDB Connected"))
+.catch(err => console.log("❌ DB Error", err));
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server started on port ${PORT}`));

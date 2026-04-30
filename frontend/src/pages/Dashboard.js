@@ -1,197 +1,320 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Edit, X, Calendar } from 'lucide-react'; 
+import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
 
+const getInitials = (name = '') =>
+  name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
 const S = {
-  navy: '#1B3A6B', navyBg: '#EEF2FA', green: '#1E7E4A', greenBg: '#EAF5EF',
-  red: '#C0392B', redBg: '#FDECEA', amber: '#8B6200', amberBg: '#FFF8E7',
-  border: '#E8ECF4', pageBg: '#F0F4FF', white: '#FFFFFF', text: '#1A1A2E',
-  muted: '#8A95B0', blue: '#2196F3', blueBg: '#E3F2FD'
+  navy:        '#1B3A6B',
+  navyBg:      '#EEF2FA',
+  navyBorder:  '#C6D4ED',
+  green:       '#1E7E4A',
+  greenBg:     '#EAF5EF',
+  red:         '#C0392B',
+  redBg:       '#FDECEA',
+  amber:       '#8B6200',
+  amberBg:     '#FFF8E7',
+  amberBorder: '#F5D78E',
+  border:      '#E8ECF4',
+  pageBg:      '#F0F4FF',
+  white:       '#FFFFFF',
+  text:        '#1A1A2E',
+  muted:       '#8A95B0',
+  blue:        '#2196F3',
+  blueBg:      '#E3F2FD'
 };
 
 const Dashboard = () => {
-  const [students, setStudents] = useState([]);
-  const [expenses, setExpenses] = useState([]);
+  const [students, setStudents]     = useState([]);
+  const [expenses, setExpenses]     = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterDay, setFilterDay] = useState(''); // Grouping by Day
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [alerts, setAlerts]         = useState([]);
+  const [loading, setLoading]       = useState(true);
 
-  // Registration States
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('1234');
-  const [joiningDate, setJoiningDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // Edit States
-  const [editingStudent, setEditingStudent] = useState(null);
+  const [name, setName]           = useState('');
+  const [phone, setPhone]         = useState('');
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('1234');
+  const [dailyRate, setDailyRate] = useState(0);
 
   const today = new Date();
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth]     = useState(today.getMonth());
+  const [viewYear, setViewYear]       = useState(today.getFullYear());
+  const [allDaysMode, setAllDaysMode] = useState(false); // ✅ NEW
+
+  const months = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
 
   useEffect(() => {
-    loadData();
-    getAlerts();
+    const initLoad = async () => {
+      setLoading(true);
+      await Promise.all([loadData(), getAlerts()]);
+      setLoading(false);
+    };
+    initLoad();
   }, []);
 
+  const getAlerts = async () => {
+    try { const res = await fetchAlerts(); setAlerts(res.data || []); }
+    catch (err) { console.log("Alert fetch error"); }
+  };
+
   const loadData = async () => {
-    setLoading(true);
     try {
       const sRes = await fetchStudents();
       const eRes = await fetchExpenses();
       setStudents(sRes.data || []);
       setExpenses(eRes.data || []);
-    } catch (err) { console.log("Load error"); }
-    setLoading(false);
+    } catch (err) { console.log("Data load error"); }
   };
 
-  const getAlerts = async () => {
-    try { const res = await fetchAlerts(); setAlerts(res.data || []); } catch (err) { }
+  const sendWelcomeMessage = (student) => {
+    const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`;
+    const msg = `Namaste ${student.name}! 🙏\nDidi's Mess mein aapka swagat hai. 🍱\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\n🔗 Link: ${portalURL}\n\n📱 Login ID: ${student.phone}\n🔑 Aapka PIN: ${student.password || '1234'}\n\nKripya is link ko save kar lein. Dhanyawad! ✨`;
+    window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  // --- EDIT FUNCTIONS ---
-  const handleEditClick = (s) => {
-    setEditingStudent({ ...s, joiningDate: s.joiningDate ? s.joiningDate.split('T')[0] : '' });
-  };
-
-  const handleSaveEdit = async () => {
+  const handleEmailReminder = async (student) => {
+    if (!student.email) return alert("email not found!");
     try {
-      await API.put(`/students/update-profile/${editingStudent._id}`, editingStudent);
-      alert("Student updated!");
-      setEditingStudent(null);
-      loadData();
-    } catch (err) { alert("Update failed"); }
+      await API.post('/students/send-email-reminder', {
+        email: student.email,
+        name: student.name,
+        totalDue: student.totalDue
+      });
+      alert(`Email sent to ${student.name}!`);
+    } catch (err) { alert("Email error!"); }
+  };
+
+  const downloadBill = async (student) => {
+    try {
+      const res = await API.get(`/students/bill-summary/${student._id}`);
+      const data = res.data;
+      const doc = new jsPDF();
+      doc.setFontSize(20);
+      doc.text("DIDI'S MESS RECEIPT", 15, 20);
+      doc.setFontSize(10);
+      doc.text(`Student: ${student.name}`, 15, 30);
+      doc.text(`Total Due: RS ${student.totalDue}`, 15, 40);
+      autoTable(doc, {
+        startY: 50,
+        head: [['Meal', 'Days', 'Rate', 'Total']],
+        body: [
+          ['Breakfast', data.breakfast || 0, '25', (data.breakfast || 0) * 25],
+          ['Lunch',     data.lunch     || 0, '50', (data.lunch     || 0) * 50],
+          ['Dinner',    data.dinner    || 0, '50', (data.dinner    || 0) * 50],
+          [{ content: 'Grand Total', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } }, student.totalDue],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [27, 58, 107] },
+      });
+      doc.save(`Bill_${student.name}.pdf`);
+    } catch (err) { alert("PDF Error!"); }
   };
 
   const handleAdd = async (e) => {
     e.preventDefault();
     try {
-      await addStudent({ name, phone, email, password, joiningDate, dailyRate: 0 });
-      setName(''); setPhone(''); setEmail(''); setPassword('1234');
-      loadData(); alert("Registered!");
-    } catch (err) { alert("Failed!"); }
+      await addStudent({ name, phone, email, password, dailyRate });
+      setName(''); setPhone(''); setEmail(''); setPassword('1234'); setDailyRate(100);
+      loadData(); getAlerts();
+      alert("Student registered!");
+    } catch (err) { alert("Registration failed!"); }
   };
 
-  // --- ACTIONS ---
-  const handleCall = (num) => window.location.href = `tel:${num}`;
-  const handlePay = async (id) => { if (window.confirm("Payment receive ho gayi?")) { await payFees(id); loadData(); } };
-  const handleDelete = async (id) => { if (window.confirm("Delete student?")) { await deleteStudent(id); loadData(); } };
+  const handlePay = async (id) => {
+    if (window.confirm("Payment receive ho gayi? bill zero ho jayega.")) {
+      try { await payFees(id); loadData(); getAlerts(); }
+      catch (err) { alert("Payment error!"); }
+    }
+  };
 
-  // ── FILTERING LOGIC ────────────────────────────────
-  const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Grouping logic: Get Day from joiningDate (e.g., "01")
-    const joinDay = s.joiningDate ? new Date(s.joiningDate).getDate().toString() : '';
-    const matchesDay = filterDay === '' || joinDay === filterDay;
+  const handleDelete = async (id) => {
+    if (window.confirm("Kya delete karna chahti hain? Saara data khatam ho jayega.")) {
+      try { await deleteStudent(id); loadData(); getAlerts(); }
+      catch (err) { alert("Delete error!"); }
+    }
+  };
 
-    return matchesSearch && matchesDay;
+  const handleCall = (phoneNumber) => {
+    window.location.href = `tel:${phoneNumber}`;
+  };
+
+  const filteredExpenses = expenses.filter(e => {
+    const d = new Date(e.date);
+    return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
   });
 
+  const totalExp     = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
+  const netProfit    = totalRevenue - totalExp;
 
-  const inp = { width: '100%', padding: '12px', borderRadius: 10, border: `1px solid ${S.border}`, marginBottom: 10, boxSizing: 'border-box' };
+  const filteredStudents = students.filter(s =>
+    s.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  if (loading) return <div style={{ textAlign: 'center', marginTop: '100px' }}><Loader2 className="animate-spin" /></div>;
+  const inp = { width: '100%', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${S.border}`, fontSize: 14, color: S.text, background: '#F8FAFF', outline: 'none', marginBottom: 10, boxSizing: 'border-box' };
+
+  const ibtn = (variant) => {
+    const map = {
+      bill: { background: S.navyBg, color: S.navy },
+      link: { background: S.greenBg, color: S.green },
+      paid: { background: S.navy,    color: S.white },
+      call: { background: S.blueBg,  color: S.blue },
+    };
+    return { border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', ...map[variant] };
+  };
+
+  const selectStyle = { padding: '10px', borderRadius: '8px', border: `1px solid ${S.border}`, flex: 1, background: S.white, fontSize: '13px', fontWeight: '600', color: S.navy };
+
+  if (loading) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: S.pageBg }}>
+        <Loader2 size={50} color={S.navy} className="spinning-icon" />
+        <p style={{ marginTop: 15, color: S.navy, fontWeight: 600, fontSize: 16 }}>Didi's Mess loading...</p>
+        <style>{`.spinning-icon { animation: rotate 1s linear infinite; } @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ background: S.pageBg, minHeight: '100vh', paddingBottom: 100 }}>
-      {/* HEADER */}
-      <div style={{ background: S.white, padding: '15px', borderBottom: `1px solid ${S.border}`, display: 'flex', justifyContent: 'space-between' }}>
-        <b style={{ color: S.navy }}>Didi's Mess Dashboard</b>
-        <div style={{ background: S.blue, color: '#fff', padding: '2px 10px', borderRadius: 20, fontSize: 12 }}>Total: {students.length}</div>
+    <div style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
+
+      {/* TOP BAR — same as original */}
+      <div style={{ background: S.white, padding: '18px 16px 14px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
+        {alerts.length > 0 && <BellRing size={20} color="#ff9800" />}
       </div>
 
-      {/* 📊 STATS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: 12 }}>
-        <div style={{ background: S.white, padding: 10, borderRadius: 10, textAlign: 'center' }}>
-            <small style={{ color: S.muted }}>UDHARI</small><br /><b>₹{totalRevenue}</b>
-        </div>
-        <div style={{ background: S.white, padding: 10, borderRadius: 10, textAlign: 'center' }}>
-            <small style={{ color: S.muted }}>ALERTS</small><br /><b>{alerts.length}</b>
-        </div>
-        <div style={{ background: S.white, padding: 10, borderRadius: 10, textAlign: 'center' }}>
-            <small style={{ color: S.muted }}>JOINING TODAY</small><br />
-            <b>{students.filter(s => new Date(s.joiningDate).getDate() === today.getDate()).length}</b>
-        </div>
-      </div>
-
-      {/* 🔍 SEARCH & GROUPING FILTER */}
-      <div style={{ padding: '0 12px', display: 'flex', gap: 8, marginBottom: 10 }}>
-        <input placeholder="🔍 Search name..." style={{ ...inp, borderRadius: 25, flex: 2, marginBottom: 0 }} onChange={e => setSearchTerm(e.target.value)} />
-        
-        <select 
-          style={{ ...inp, borderRadius: 25, flex: 1, marginBottom: 0, fontSize: 12 }}
-          value={filterDay}
-          onChange={e => setFilterDay(e.target.value)}
+      {/* ✅ MONTH SELECTOR — "All Days" option added, baaki same */}
+      <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>
+        <select
+          value={allDaysMode ? 'all' : viewMonth}
+          onChange={(e) => {
+            if (e.target.value === 'all') {
+              setAllDaysMode(true);
+            } else {
+              setAllDaysMode(false);
+              setViewMonth(parseInt(e.target.value));
+            }
+          }}
+          style={selectStyle}
         >
-          <option value="">All Days</option>
-          {[...Array(31)].map((_, i) => (
-            <option key={i+1} value={i+1}>{i+1} Tarik</option>
-          ))}
+          <option value="all">📋 All Days</option>
+          {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
         </select>
+        {!allDaysMode && (
+          <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} style={selectStyle}>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+          </select>
+        )}
       </div>
 
-      {/* STUDENT LIST */}
+      {/* ✅ NEW: All Days mode mein joining dates panel */}
+      {allDaysMode && (
+        <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 14, padding: '12px', border: `1px solid ${S.navyBorder}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>📅 Students Joining Dates</div>
+          {students.length === 0 && (
+            <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>
+          )}
+          {students.map(s => (
+            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 4px', borderBottom: `1px solid ${S.border}` }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: S.text }}>{s.name}</span>
+              <span style={{ fontSize: 12, color: S.muted }}>
+                {s.joiningDate
+                  ? new Date(s.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : s.createdAt
+                  ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : 'N/A'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* STATS CARDS — same as original */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '0 12px 14px' }}>
+        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
+          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.green }}>₹{totalRevenue}</div>
+        </div>
+        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.red}` }}>
+          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Expense</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.red }}>₹{totalExp}</div>
+        </div>
+        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.navy}` }}>
+          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Profit</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: netProfit >= 0 ? S.green : S.red }}>₹{netProfit}</div>
+        </div>
+        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.blue}` }}>
+          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Students</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.blue }}>{students.length}</div>
+        </div>
+      </div>
+
+      {/* ALERTS — same as original */}
+      {alerts.length > 0 && (
+        <div style={{ margin: '0 12px 14px', background: S.amberBg, borderRadius: 14, padding: '12px', border: `1px solid ${S.amberBorder}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>⚠️ Payment Alerts ({alerts.length})</div>
+          {alerts.map(s => (
+            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: S.white, padding: '10px', borderRadius: 8, marginBottom: 5 }}>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 600, display: 'block' }}>{s.name}</span>
+                <span style={{ fontSize: 10, color: S.red }}>{s.daysPassed} Days Overdue</span>
+              </div>
+              <button onClick={() => handleEmailReminder(s)} style={{ fontSize: 11, background: S.red, border: 'none', color: S.white, fontWeight: 700, padding: '5px 10px', borderRadius: 5 }}>Alert Email</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* REGISTER FORM — same as original */}
+      <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <UserPlus size={16} color={S.navy}/> New Registration
+        </div>
+        <form onSubmit={handleAdd}>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Student name" required style={inp} />
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number (Login ID)" required style={inp} />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email ID (for alerts)" style={inp} />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" required style={inp} />
+          <button type="submit" style={{ width: '100%', padding: 12, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>
+            Register Student
+          </button>
+        </form>
+      </div>
+
+      {/* SEARCH — same as original */}
+      <div style={{ padding: '0 12px 15px' }}>
+        <input type="text" placeholder="🔍 Search students..." style={{ ...inp, borderRadius: 25, marginBottom: 0 }} onChange={e => setSearchTerm(e.target.value)} />
+      </div>
+
+      {/* STUDENT LIST — same as original */}
       <div style={{ padding: '0 12px' }}>
         {filteredStudents.map(s => (
-          <div key={s._id} style={{ background: S.white, borderRadius: 15, padding: 12, marginBottom: 10, borderLeft: `5px solid ${S.navy}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <b>{s.name}</b>
-                <div style={{ fontSize: 11, color: S.muted }}>Join: {new Date(s.joiningDate).toLocaleDateString()}</div>
-                <div style={{ fontSize: 13, color: S.red, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
-              </div>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <button onClick={() => handleCall(s.phone)} style={{ padding: 8, border: 'none', borderRadius: 8, background: S.blueBg, color: S.blue }}><Phone size={14}/></button>
-                <button onClick={() => handleEditClick(s)} style={{ padding: 8, border: 'none', borderRadius: 8, background: '#eee' }}><Edit size={14}/></button>
-                <button onClick={() => handleDelete(s._id)} style={{ padding: 8, border: 'none', borderRadius: 8, background: S.redBg, color: S.red }}><Trash2 size={14}/></button>
-              </div>
+          <div key={s._id} style={{ background: S.white, borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${S.border}`, borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}` }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{getInitials(s.name)}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{s.name}</div>
+              <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
             </div>
-            <div style={{ marginTop: 10, display: 'flex', gap: 5 }}>
-                <button onClick={() => handlePay(s._id)} style={{ flex: 1, padding: 8, background: S.navy, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}>Pay Bill</button>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={() => handleCall(s.phone)} style={ibtn('call')}><Phone size={14}/></button>
+              <button onClick={() => downloadBill(s)} style={ibtn('bill')}><Download size={14} /></button>
+              <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')}><MessageCircle size={14} /></button>
+              <button onClick={() => handlePay(s._id)} style={ibtn('paid')}>Paid</button>
+              <button onClick={() => handleDelete(s._id)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 7 }}><Trash2 size={14}/></button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* REGISTER FORM */}
-      <div style={{ margin: '15px 12px', background: S.white, borderRadius: 15, padding: 15 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 10 }}><UserPlus size={16}/> New Student</div>
-        <form onSubmit={handleAdd}>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" required style={inp} />
-          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone" required style={inp} />
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" style={inp} />
-          <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" style={inp} />
-          <label style={{ fontSize: 11, color: S.muted }}>Joining Date:</label>
-          <input type="date" value={joiningDate} onChange={e => setJoiningDate(e.target.value)} style={inp} />
-          <button type="submit" style={{ width: '100%', padding: 12, background: S.navy, color: '#fff', border: 'none', borderRadius: 10 }}>Register</button>
-        </form>
-      </div>
-
-      {/* --- EDIT MODAL --- */}
-      {editingStudent && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', width: '90%', maxWidth: '400px', padding: 20, borderRadius: 15 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
-              <b>Edit Student</b>
-              <X onClick={() => setEditingStudent(null)} style={{ cursor: 'pointer' }}/>
-            </div>
-            <input value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} placeholder="Name" style={inp} />
-            <input value={editingStudent.email} onChange={e => setEditingStudent({...editingStudent, email: e.target.value})} placeholder="Email" style={inp} />
-            <input value={editingStudent.password} onChange={e => setEditingStudent({...editingStudent, password: e.target.value})} placeholder="Password" style={inp} />
-            <label style={{ fontSize: 11 }}>Joining Date:</label>
-            <input type="date" value={editingStudent.joiningDate} onChange={e => setEditingStudent({...editingStudent, joiningDate: e.target.value})} style={inp} />
-            <button onClick={handleSaveEdit} style={{ width: '100%', padding: 12, background: S.green, color: '#fff', border: 'none', borderRadius: 10 }}>Update Student</button>
-          </div>
-        </div>
-      )}
-
-      <style>{`.animate-spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
