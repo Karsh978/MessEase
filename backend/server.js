@@ -34,17 +34,16 @@ const Dashboard = () => {
   const [alerts, setAlerts]         = useState([]);
   const [loading, setLoading]       = useState(true);
 
-  const [name, setName]         = useState('');
-  const [phone, setPhone]       = useState('');
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('1234');
+  const [name, setName]           = useState('');
+  const [phone, setPhone]         = useState('');
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('1234');
   const [dailyRate, setDailyRate] = useState(0);
 
   const today = new Date();
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [viewYear, setViewYear]   = useState(today.getFullYear());
-  // -1 = "All Days" mode
-  const [allDaysMode, setAllDaysMode] = useState(false);
+  const [viewMonth, setViewMonth]     = useState(today.getMonth());
+  const [viewYear, setViewYear]       = useState(today.getFullYear());
+  const [allDaysMode, setAllDaysMode] = useState(false); // ✅ NEW
 
   const months = [
     "January","February","March","April","May","June",
@@ -146,14 +145,10 @@ const Dashboard = () => {
     window.location.href = `tel:${phoneNumber}`;
   };
 
-  // ── SMART CALCULATIONS ───────────────────────────────
-  // "All Days" mode mein saare expenses, warna selected month ke
-  const filteredExpenses = allDaysMode
-    ? expenses
-    : expenses.filter(e => {
-        const d = new Date(e.date);
-        return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-      });
+  const filteredExpenses = expenses.filter(e => {
+    const d = new Date(e.date);
+    return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
+  });
 
   const totalExp     = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
@@ -163,7 +158,6 @@ const Dashboard = () => {
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // ── Styles ──────────────────────────────────────────────────
   const inp = { width: '100%', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${S.border}`, fontSize: 14, color: S.text, background: '#F8FAFF', outline: 'none', marginBottom: 10, boxSizing: 'border-box' };
 
   const ibtn = (variant) => {
@@ -191,13 +185,13 @@ const Dashboard = () => {
   return (
     <div style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
 
-      {/* TOP BAR */}
+      {/* TOP BAR — same as original */}
       <div style={{ background: S.white, padding: '18px 16px 14px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
         {alerts.length > 0 && <BellRing size={20} color="#ff9800" />}
       </div>
 
-      {/* 📅 MONTH SELECTOR — "All Days" option added */}
+      {/* ✅ MONTH SELECTOR — "All Days" option added, baaki same */}
       <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>
         <select
           value={allDaysMode ? 'all' : viewMonth}
@@ -214,8 +208,6 @@ const Dashboard = () => {
           <option value="all">📋 All Days</option>
           {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
         </select>
-
-        {/* Year selector sirf tab dikhao jab All Days mode OFF ho */}
         {!allDaysMode && (
           <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} style={selectStyle}>
             <option value="2025">2025</option>
@@ -224,17 +216,21 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* "All Days" mode mein joining dates dikhao */}
+      {/* ✅ NEW: All Days mode mein joining dates panel */}
       {allDaysMode && (
         <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 14, padding: '12px', border: `1px solid ${S.navyBorder}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>📅 Students Joining Dates</div>
-          {students.length === 0 && <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>}
+          {students.length === 0 && (
+            <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>
+          )}
           {students.map(s => (
             <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 4px', borderBottom: `1px solid ${S.border}` }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: S.text }}>{s.name}</span>
               <span style={{ fontSize: 12, color: S.muted }}>
                 {s.joiningDate
                   ? new Date(s.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : s.createdAt
+                  ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                   : 'N/A'}
               </span>
             </div>
@@ -242,7 +238,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* STATS CARDS — 4 columns with Students count */}
+      {/* STATS CARDS — same as original */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '0 12px 14px' }}>
         <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
           <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
@@ -256,14 +252,13 @@ const Dashboard = () => {
           <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Profit</div>
           <div style={{ fontSize: 11, fontWeight: 700, color: netProfit >= 0 ? S.green : S.red }}>₹{netProfit}</div>
         </div>
-        {/* ✅ NEW: Total Students Card */}
         <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.blue}` }}>
           <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Students</div>
           <div style={{ fontSize: 11, fontWeight: 700, color: S.blue }}>{students.length}</div>
         </div>
       </div>
 
-      {/* 🔔 ALERTS SECTION */}
+      {/* ALERTS — same as original */}
       {alerts.length > 0 && (
         <div style={{ margin: '0 12px 14px', background: S.amberBg, borderRadius: 14, padding: '12px', border: `1px solid ${S.amberBorder}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>⚠️ Payment Alerts ({alerts.length})</div>
@@ -279,7 +274,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* REGISTER FORM */}
+      {/* REGISTER FORM — same as original */}
       <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
           <UserPlus size={16} color={S.navy}/> New Registration
@@ -295,12 +290,12 @@ const Dashboard = () => {
         </form>
       </div>
 
-      {/* SEARCH */}
+      {/* SEARCH — same as original */}
       <div style={{ padding: '0 12px 15px' }}>
         <input type="text" placeholder="🔍 Search students..." style={{ ...inp, borderRadius: 25, marginBottom: 0 }} onChange={e => setSearchTerm(e.target.value)} />
       </div>
 
-      {/* STUDENT LIST */}
+      {/* STUDENT LIST — same as original */}
       <div style={{ padding: '0 12px' }}>
         {filteredStudents.map(s => (
           <div key={s._id} style={{ background: S.white, borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${S.border}`, borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}` }}>
@@ -319,6 +314,7 @@ const Dashboard = () => {
           </div>
         ))}
       </div>
+
     </div>
   );
 };
