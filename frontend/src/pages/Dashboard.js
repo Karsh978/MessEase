@@ -505,21 +505,9 @@ const Dashboard = () => {
             {/* Top row: avatar + name/bill + buttons */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {/* Avatar */}
-              {s.profilePic ? (
-  <img
-    src={s.profilePic}
-    alt={s.name}
-    style={{ width: 40, height: 40, borderRadius: '50%',
-    objectFit: 'cover', flexShrink: 0,
-    border: `2px solid ${S.navyBorder}` }}
-  />
-) : (
-  <div style={{ width: 40, height: 40, borderRadius: '50%', background: S.navyBg,
-  color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  fontWeight: 700, flexShrink: 0 }}>
-    {getInitials(s.name)}
-  </div>
-)}
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
+                {getInitials(s.name)}
+              </div>
               {/* Name + Bill */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
