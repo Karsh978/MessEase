@@ -53,19 +53,10 @@ app.use('/api/menu/update', authAdmin);
 // ============================================================
 
 // [NAYA FEATURE] - DIRECT PORTAL ACCESS BINA PASSWORD KE
-// server.js mein ye add karein:
 app.get('/api/students/portal-direct/:id', async (req, res) => {
-    try {
-        const student = await Student.findById(req.params.id);
-        if (!student) {
-            return res.status(404).json({ msg: "Student nahi mila!" });
-        }
-        // Attendance fetch karein
-        const attendance = await Attendance.find({ studentId: student._id }).sort({ date: -1 });
-        res.json({ student, attendance });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    const student = await Student.findById(req.params.id);
+    const attendance = await Attendance.find({ studentId: student._id }).sort({ date: -1 });
+    res.json({ student, attendance });
 });
 
 // 1. STUDENT PORTAL LOGIN (Purana Password wala logic)
