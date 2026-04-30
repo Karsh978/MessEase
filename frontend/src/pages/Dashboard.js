@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone } from 'lucide-react';
+import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Pencil, X, Check } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
@@ -24,7 +24,9 @@ const S = {
   text:        '#1A1A2E',
   muted:       '#8A95B0',
   blue:        '#2196F3',
-  blueBg:      '#E3F2FD'
+  blueBg:      '#E3F2FD',
+  purple:      '#7C3AED',
+  purpleBg:    '#F3EEFF',
 };
 
 const Dashboard = () => {
@@ -40,10 +42,17 @@ const Dashboard = () => {
   const [password, setPassword]   = useState('1234');
   const [dailyRate, setDailyRate] = useState(0);
 
+  // ✅ Edit Modal State
+  const [editStudent, setEditStudent]         = useState(null);
+  const [editName, setEditName]               = useState('');
+  const [editPhone, setEditPhone]             = useState('');
+  const [editEmail, setEditEmail]             = useState('');
+  const [editJoiningDate, setEditJoiningDate] = useState('');
+
   const today = new Date();
   const [viewMonth, setViewMonth]     = useState(today.getMonth());
   const [viewYear, setViewYear]       = useState(today.getFullYear());
-  const [allDaysMode, setAllDaysMode] = useState(false); // ✅ NEW
+  const [allDaysMode, setAllDaysMode] = useState(false);
 
   const months = [
     "January","February","March","April","May","June",
@@ -145,6 +154,32 @@ const Dashboard = () => {
     window.location.href = `tel:${phoneNumber}`;
   };
 
+  // ✅ Edit Modal Open
+  const openEdit = (s) => {
+    setEditStudent(s);
+    setEditName(s.name || '');
+    setEditPhone(s.phone || '');
+    setEditEmail(s.email || '');
+    // joiningDate ya createdAt jo bhi mile
+    const jd = s.joiningDate || s.createdAt || '';
+    setEditJoiningDate(jd ? new Date(jd).toISOString().split('T')[0] : '');
+  };
+
+  // ✅ Edit Save — backend call
+  const handleEditSave = async () => {
+    try {
+      await API.put(`/students/${editStudent._id}`, {
+        name: editName,
+        phone: editPhone,
+        email: editEmail,
+        joiningDate: editJoiningDate,
+      });
+      setEditStudent(null);
+      loadData();
+      alert("Student updated!");
+    } catch (err) { alert("Update failed!"); }
+  };
+
   const filteredExpenses = expenses.filter(e => {
     const d = new Date(e.date);
     return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
@@ -162,10 +197,11 @@ const Dashboard = () => {
 
   const ibtn = (variant) => {
     const map = {
-      bill: { background: S.navyBg, color: S.navy },
-      link: { background: S.greenBg, color: S.green },
-      paid: { background: S.navy,    color: S.white },
-      call: { background: S.blueBg,  color: S.blue },
+      bill:   { background: S.navyBg,   color: S.navy   },
+      link:   { background: S.greenBg,  color: S.green  },
+      paid:   { background: S.navy,     color: S.white  },
+      call:   { background: S.blueBg,   color: S.blue   },
+      edit:   { background: S.purpleBg, color: S.purple },
     };
     return { border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', ...map[variant] };
   };
@@ -185,23 +221,62 @@ const Dashboard = () => {
   return (
     <div style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
 
-      {/* TOP BAR — same as original */}
+      {/* ✅ EDIT MODAL */}
+      {editStudent && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }}>
+          <div style={{ background: S.white, borderRadius: 20, padding: 20, width: '100%', maxWidth: 400 }}>
+
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: S.navy, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Pencil size={15} color={S.purple} /> Edit Student
+              </div>
+              <button onClick={() => setEditStudent(null)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 6, cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Fields */}
+            <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Student name" style={inp} />
+            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone number" style={inp} />
+            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email ID" style={inp} />
+
+            {/* Joining Date */}
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 12, color: S.muted, fontWeight: 600, display: 'block', marginBottom: 4 }}>📅 Joining Date</label>
+              <input
+                type="date"
+                value={editJoiningDate}
+                onChange={e => setEditJoiningDate(e.target.value)}
+                style={{ ...inp, marginBottom: 0 }}
+              />
+            </div>
+
+            {/* Save Button */}
+            <button
+              onClick={handleEditSave}
+              style={{ width: '100%', padding: 12, background: S.purple, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              <Check size={16} /> Save Changes
+            </button>
+
+          </div>
+        </div>
+      )}
+
+      {/* TOP BAR */}
       <div style={{ background: S.white, padding: '18px 16px 14px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
         {alerts.length > 0 && <BellRing size={20} color="#ff9800" />}
       </div>
 
-      {/* ✅ MONTH SELECTOR — "All Days" option added, baaki same */}
+      {/* MONTH SELECTOR */}
       <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>
         <select
           value={allDaysMode ? 'all' : viewMonth}
           onChange={(e) => {
-            if (e.target.value === 'all') {
-              setAllDaysMode(true);
-            } else {
-              setAllDaysMode(false);
-              setViewMonth(parseInt(e.target.value));
-            }
+            if (e.target.value === 'all') { setAllDaysMode(true); }
+            else { setAllDaysMode(false); setViewMonth(parseInt(e.target.value)); }
           }}
           style={selectStyle}
         >
@@ -216,13 +291,11 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* ✅ NEW: All Days mode mein joining dates panel */}
+      {/* ALL DAYS — Joining Dates Panel */}
       {allDaysMode && (
         <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 14, padding: '12px', border: `1px solid ${S.navyBorder}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>📅 Students Joining Dates</div>
-          {students.length === 0 && (
-            <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>
-          )}
+          {students.length === 0 && <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>}
           {students.map(s => (
             <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 4px', borderBottom: `1px solid ${S.border}` }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: S.text }}>{s.name}</span>
@@ -238,7 +311,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* STATS CARDS — same as original */}
+      {/* STATS CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '0 12px 14px' }}>
         <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
           <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
@@ -258,7 +331,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ALERTS — same as original */}
+      {/* ALERTS */}
       {alerts.length > 0 && (
         <div style={{ margin: '0 12px 14px', background: S.amberBg, borderRadius: 14, padding: '12px', border: `1px solid ${S.amberBorder}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>⚠️ Payment Alerts ({alerts.length})</div>
@@ -274,7 +347,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* REGISTER FORM — same as original */}
+      {/* REGISTER FORM */}
       <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
           <UserPlus size={16} color={S.navy}/> New Registration
@@ -290,12 +363,12 @@ const Dashboard = () => {
         </form>
       </div>
 
-      {/* SEARCH — same as original */}
+      {/* SEARCH */}
       <div style={{ padding: '0 12px 15px' }}>
         <input type="text" placeholder="🔍 Search students..." style={{ ...inp, borderRadius: 25, marginBottom: 0 }} onChange={e => setSearchTerm(e.target.value)} />
       </div>
 
-      {/* STUDENT LIST — same as original */}
+      {/* STUDENT LIST */}
       <div style={{ padding: '0 12px' }}>
         {filteredStudents.map(s => (
           <div key={s._id} style={{ background: S.white, borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${S.border}`, borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}` }}>
@@ -305,7 +378,11 @@ const Dashboard = () => {
               <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
+              {/* ✅ CALL BUTTON */}
               <button onClick={() => handleCall(s.phone)} style={ibtn('call')}><Phone size={14}/></button>
+              {/* ✅ EDIT BUTTON — Call ke paas */}
+              <button onClick={() => openEdit(s)} style={ibtn('edit')}><Pencil size={14}/></button>
+
               <button onClick={() => downloadBill(s)} style={ibtn('bill')}><Download size={14} /></button>
               <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')}><MessageCircle size={14} /></button>
               <button onClick={() => handlePay(s._id)} style={ibtn('paid')}>Paid</button>
