@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone } from 'lucide-react'; // Phone icon add kiya
+import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone } from 'lucide-react'; // Phone add kiya
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
@@ -25,7 +25,7 @@ const S = {
   white:       '#FFFFFF',
   text:        '#1A1A2E',
   muted:       '#8A95B0',
-  blue:        '#2196F3', // Call ke liye blue color
+  blue:        '#2196F3', // Call button ke liye
   blueBg:      '#E3F2FD'
 };
 
@@ -42,6 +42,7 @@ const Dashboard = () => {
   const [password, setPassword] = useState('1234');
   const [dailyRate, setDailyRate] = useState(100); 
 
+  // Month Selector States
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -74,14 +75,9 @@ const Dashboard = () => {
     } catch (err) { console.log("Data load error"); }
   };
 
-  // Calling Function
-  const handleCall = (phoneNumber) => {
-    window.open(`tel:${phoneNumber}`, '_self');
-  };
-
   const sendWelcomeMessage = (student) => {
     const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`; 
-    const msg = `Namaste ${student.name}! 🙏\nDidi's Mess mein aapka swagat hai. 🍱\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\n🔗 Link: ${portalURL}\n\nKripya is link ko save kar lein. Dhanyawad! ✨`;
+    const msg = `Namaste ${student.name}! 🙏\nDidi's Mess mein aapka swagat hai. 🍱\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\n🔗 Link: ${portalURL}\n\n📱 Login ID: ${student.phone}\n🔑 Aapka PIN: ${student.password || '1234'}\n\nKripya is link ko save kar lein. Dhanyawad! ✨`;
     window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -89,7 +85,9 @@ const Dashboard = () => {
     if (!student.email) return alert("email not found!");
     try {
       await API.post('/students/send-email-reminder', {
-        email: student.email, name: student.name, totalDue: student.totalDue
+        email: student.email,
+        name: student.name,
+        totalDue: student.totalDue
       });
       alert(`Email sent to ${student.name}!`);
     } catch (err) { alert("Email error!"); }
@@ -102,6 +100,10 @@ const Dashboard = () => {
       const doc = new jsPDF();
       doc.setFontSize(20);
       doc.text("DIDI'S MESS RECEIPT", 15, 20);
+      doc.setFontSize(10);
+      doc.text(`Student: ${student.name}`, 15, 30);
+      doc.text(`Total Due: RS ${student.totalDue}`, 15, 40);
+
       autoTable(doc, {
         startY: 50,
         head: [['Meal', 'Days', 'Rate', 'Total']],
@@ -136,10 +138,15 @@ const Dashboard = () => {
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm("Delete karna chahti hain?")) {
+    if(window.confirm("Kya delete karna chahti hain? Saara data khatam ho jayega.")) {
       try { await deleteStudent(id); loadData(); getAlerts(); }
       catch (err) { alert("Delete error!"); }
     }
+  };
+
+  // Calling logic
+  const handleCall = (phoneNumber) => {
+    window.location.href = `tel:${phoneNumber}`;
   };
 
   // ── SMART CALCULATIONS ───────────────────────────────
@@ -164,9 +171,9 @@ const Dashboard = () => {
         bill: { background: S.navyBg, color: S.navy }, 
         link: { background: S.greenBg, color: S.green }, 
         paid: { background: S.navy, color: S.white },
-        call: { background: S.blueBg, color: S.blue } // Call button style
+        call: { background: S.blueBg, color: S.blue } // Naya call button color
     };
-    return { border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 3, ...map[variant] };
+    return { border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', ...map[variant] };
   };
   
   const selectStyle = { padding: '10px', borderRadius: '8px', border: `1px solid ${S.border}`, flex: 1, background: S.white, fontSize: '13px', fontWeight: '600', color: S.navy };
@@ -175,60 +182,100 @@ const Dashboard = () => {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: S.pageBg }}>
         <Loader2 size={50} color={S.navy} className="spinning-icon" />
-        <p style={{ marginTop: 15, color: S.navy, fontWeight: 600 }}>Didi's Mess loading...</p>
-        <style>{`.spinning-icon { animation: rotate 1s linear infinite; } @keyframes rotate { to { transform: rotate(360deg); } }`}</style>
+        <p style={{ marginTop: 15, color: S.navy, fontWeight: 600, fontSize: 16 }}>Didi's Mess loading...</p>
+        <style>{`.spinning-icon { animation: rotate 1s linear infinite; } @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
-    <div style={{ background: S.pageBg, minHeight: '100vh', paddingBottom: 100 }}>
+    <div style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
 
       {/* TOP BAR */}
-      <div style={{ background: S.white, padding: '18px 16px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ background: S.white, padding: '18px 16px 14px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
         {alerts.length > 0 && <BellRing size={20} color="#ff9800" />}
       </div>
 
-      {/* STATS CARDS (AB 4 CARDS HAIN) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '12px' }}>
-        <div style={{ background: S.white, borderRadius: 12, padding: '10px 5px', textAlign: 'center', borderBottom: `3px solid ${S.green}` }}>
-          <div style={{ fontSize: 8, color: S.muted }}>UDHARI</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: S.green }}>₹{totalRevenue}</div>
+      {/* 📅 MONTH SELECTOR */}
+      <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>
+        <select value={viewMonth} onChange={(e) => setViewMonth(parseInt(e.target.value))} style={selectStyle}>
+          {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
+        </select>
+        <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} style={selectStyle}>
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+
+      {/* STATS CARDS (Updated to 4 Columns) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '0 12px 14px' }}>
+        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
+          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.green }}>₹{totalRevenue}</div>
         </div>
-        <div style={{ background: S.white, borderRadius: 12, padding: '10px 5px', textAlign: 'center', borderBottom: `3px solid ${S.red}` }}>
-          <div style={{ fontSize: 8, color: S.muted }}>EXPENSE</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: S.red }}>₹{totalExp}</div>
+        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.red}` }}>
+          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Expense</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.red }}>₹{totalExp}</div>
         </div>
-        <div style={{ background: S.white, borderRadius: 12, padding: '10px 5px', textAlign: 'center', borderBottom: `3px solid ${S.navy}` }}>
-          <div style={{ fontSize: 8, color: S.muted }}>PROFIT</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: netProfit >= 0 ? S.green : S.red }}>₹{netProfit}</div>
+        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.navy}` }}>
+          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Profit</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: netProfit >= 0 ? S.green : S.red }}>₹{netProfit}</div>
         </div>
-        {/* 🔥 TOTAL STUDENTS CARD */}
-        <div style={{ background: S.white, borderRadius: 12, padding: '10px 5px', textAlign: 'center', borderBottom: `3px solid ${S.blue}` }}>
-          <div style={{ fontSize: 8, color: S.muted }}>STUDENTS</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: S.blue }}>{students.length}</div>
+        {/* TOTAL STUDENT CARD */}
+        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.blue}` }}>
+          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Students</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.blue }}>{students.length}</div>
         </div>
       </div>
 
+      {/* 🔔 ALERTS SECTION */}
+      {alerts.length > 0 && (
+        <div style={{ margin: '0 12px 14px', background: S.amberBg, borderRadius: 14, padding: '12px', border: `1px solid ${S.amberBorder}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>⚠️ Payment Alerts ({alerts.length})</div>
+          {alerts.map(s => (
+            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: S.white, padding: '10px', borderRadius: 8, marginBottom: 5 }}>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 600, display: 'block' }}>{s.name}</span>
+                <span style={{ fontSize: 10, color: S.red }}>{s.daysPassed} Days Overdue</span>
+              </div>
+              <button onClick={() => handleEmailReminder(s)} style={{ fontSize: 11, background: S.red, border: 'none', color: S.white, fontWeight: 700, padding: '5px 10px', borderRadius: 5 }}>Alert Email</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* REGISTER FORM */}
+      <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}><UserPlus size={16} color={S.navy}/> New Registration</div>
+        <form onSubmit={handleAdd}>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Student name" required style={inp} />
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number (Login ID)" required style={inp} />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email ID (for alerts)" style={inp} />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Set PIN (e.g. 1234)" required style={inp} />
+          <input type="number" value={dailyRate} onChange={e => setDailyRate(e.target.value)} placeholder="Daily Rate (₹)" style={inp} />
+          <button type="submit" style={{ width: '100%', padding: 12, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>Register Student</button>
+        </form>
+      </div>
+
       {/* SEARCH */}
-      <div style={{ padding: '0 12px 10px' }}>
-        <input type="text" placeholder="🔍 Search students..." style={{ ...inp, borderRadius: 25 }} onChange={e => setSearchTerm(e.target.value)} />
+      <div style={{ padding: '0 12px 15px' }}>
+        <input type="text" placeholder="🔍 Search students..." style={{ ...inp, borderRadius: 25, marginBottom: 0 }} onChange={e => setSearchTerm(e.target.value)} />
       </div>
 
       {/* STUDENT LIST */}
       <div style={{ padding: '0 12px' }}>
         {filteredStudents.map(s => (
-          <div key={s._id} style={{ background: S.white, borderRadius: 16, padding: '12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${S.border}` }}>
-            <div style={{ width: 35, height: 35, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12 }}>{getInitials(s.name)}</div>
+          <div key={s._id} style={{ background: S.white, borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${S.border}`, borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}` }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{getInitials(s.name)}</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{s.name}</div>
-              <div style={{ fontSize: 11, color: s.totalDue > 0 ? S.red : S.green }}>₹{s.totalDue}</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{s.name}</div>
+              <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
-              {/* 🔥 CALL BUTTON */}
-              <button onClick={() => handleCall(s.phone)} style={ibtn('call')}><Phone size={14} /></button>
-              
+              {/* CALL BUTTON */}
+              <button onClick={() => handleCall(s.phone)} style={ibtn('call')}><Phone size={14}/></button>
+
               <button onClick={() => downloadBill(s)} style={ibtn('bill')}><Download size={14} /></button>
               <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')}><MessageCircle size={14} /></button>
               <button onClick={() => handlePay(s._id)} style={ibtn('paid')}>Paid</button>
@@ -237,8 +284,6 @@ const Dashboard = () => {
           </div>
         ))}
       </div>
-      
-      {/* REGISTER FORM... (Rest of the code remains same) */}
     </div>
   );
 };
