@@ -1,9 +1,69 @@
 import React, { useState } from 'react';
 import { loginStudent, fetchMenu, updateStudentProfile } from '../api';
 import { 
-  User, Calendar, CreditCard, Utensils, MapPin, 
-  PhoneCall, Mail, Camera, Save, XCircle, LogOut 
+  Utensils, MapPin, Mail, Camera, LogOut 
 } from 'lucide-react';
+
+// ✨ Google-style Color-Changing Loader Component
+const GoogleLoader = () => (
+  <div style={{
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', minHeight: '100vh', background: '#f4f7f6',
+    fontFamily: 'Arial'
+  }}>
+    <style>{`
+      @keyframes spin {
+        0%   { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes colorShift {
+        0%   { stroke: #4285F4; }
+        25%  { stroke: #EA4335; }
+        50%  { stroke: #FBBC05; }
+        75%  { stroke: #34A853; }
+        100% { stroke: #4285F4; }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .google-ring {
+        transform-origin: 50px 50px;
+        animation: spin 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite,
+                   colorShift 2.8s linear infinite;
+        fill: none;
+        stroke-width: 6;
+        stroke-linecap: round;
+        stroke-dasharray: 120 60;
+      }
+      .loader-text {
+        animation: fadeIn 0.5s ease forwards;
+      }
+      @keyframes dotPulse {
+        0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+        40% { opacity: 1; transform: scale(1.2); }
+      }
+      .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #888; margin: 0 3px; }
+      .dot:nth-child(1) { animation: dotPulse 1.2s ease-in-out 0s infinite; }
+      .dot:nth-child(2) { animation: dotPulse 1.2s ease-in-out 0.2s infinite; }
+      .dot:nth-child(3) { animation: dotPulse 1.2s ease-in-out 0.4s infinite; }
+    `}</style>
+
+    <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="38" fill="none" stroke="#e8e8e8" strokeWidth="6"/>
+      <circle className="google-ring" cx="50" cy="50" r="38"/>
+    </svg>
+
+    <p className="loader-text" style={{ marginTop: '20px', color: '#555', fontSize: '15px', fontWeight: '500' }}>
+      Loading your dashboard
+    </p>
+    <div style={{ marginTop: '8px' }}>
+      <span className="dot"/>
+      <span className="dot"/>
+      <span className="dot"/>
+    </div>
+  </div>
+);
 
 const StudentPortal = () => {
   // Login & Data States
@@ -13,6 +73,7 @@ const StudentPortal = () => {
   const [menu, setMenu] = useState(null);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // ✅ NEW
 
   // Edit Form States
   const [editForm, setEditForm] = useState({
@@ -24,9 +85,10 @@ const StudentPortal = () => {
 
   const todayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date().getDay()];
 
-  // 1. Login Function (Original)
+  // 1. Login Function
   const handleLogin = async () => {
-    if(!phone || !password) return alert("fill-up both phone no and pin!");
+    if (!phone || !password) return alert("fill-up both phone no and pin!");
+    setIsLoading(true); // ✅ START loading
     try {
       const res = await loginStudent({ phone, password });
       setData(res.data);
@@ -47,6 +109,8 @@ const StudentPortal = () => {
       setError('');
     } catch (err) {
       setError(err.response?.data?.msg || "Ghalat Number ya PIN!");
+    } finally {
+      setIsLoading(false); // ✅ STOP loading (error ho ya success)
     }
   };
 
@@ -74,6 +138,9 @@ const StudentPortal = () => {
       alert("Profile updated successfully! ✨");
     } catch (err) { alert("Update failed!"); }
   };
+
+  // ✅ Show Google Loader while logging in
+  if (isLoading) return <GoogleLoader />;
 
   // Login Screen
   if (!data) return (
@@ -111,8 +178,8 @@ const StudentPortal = () => {
         {isEditing ? (
           <div style={{ marginTop: '20px' }}>
             <input type="file" onChange={handleImageChange} style={inputStyle} />
-            <input style={inputStyle} value={editForm.email} placeholder="Email" onChange={e => setEditForm({...editForm, email:e.target.value})} />
-            <input style={inputStyle} value={editForm.address} placeholder="Address" onChange={e => setEditForm({...editForm, address:e.target.value})} />
+            <input style={inputStyle} value={editForm.email} placeholder="Email" onChange={e => setEditForm({...editForm, email: e.target.value})} />
+            <input style={inputStyle} value={editForm.address} placeholder="Address" onChange={e => setEditForm({...editForm, address: e.target.value})} />
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={handleUpdate} style={{ ...btnStyle, background: '#2e7d32' }}>Save</button>
               <button onClick={() => setIsEditing(false)} style={{ ...btnStyle, background: '#666' }}>Cancel</button>
@@ -158,7 +225,7 @@ const StudentPortal = () => {
   );
 };
 
-// Styles (Original)
+// Styles (Original - unchanged)
 const cardStyle = (bg, border) => ({ background: bg, border, padding: '20px', borderRadius: '15px', marginBottom: '15px' });
 const inputStyle = { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' };
 const btnStyle = { width: '100%', padding: '12px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' };
