@@ -37,6 +37,7 @@ const authAdmin = (req, res, next) => {
 const Student = require('./models/Student');
 const Attendance = require('./models/Attendance');
 const Menu = require('./models/Menu');
+ const Expense = require('./models/Expense'); 
 
 
 // 4. Routes Import
