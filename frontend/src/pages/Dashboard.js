@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Pencil, X, Check } from 'lucide-react';
+import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Pencil, X, Check, FileText } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
@@ -125,6 +125,55 @@ const Dashboard = () => {
     } catch (err) { alert("PDF Error!"); }
   };
 
+  // ── FIX: downloadMonthlyReport was referenced but never defined ──
+  const downloadMonthlyReport = () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text("DIDI'S MESS - MONTHLY REPORT", 15, 20);
+      doc.setFontSize(11);
+      doc.text(`Month: ${months[viewMonth]} ${viewYear}`, 15, 32);
+      doc.text(`Total Udhari (Revenue): RS ${totalRevenue}`, 15, 42);
+      doc.text(`Total Expenses: RS ${totalExp}`, 15, 52);
+      doc.text(`Net Profit: RS ${netProfit}`, 15, 62);
+      doc.text(`Total Students: ${students.length}`, 15, 72);
+
+      // Student-wise dues table
+      autoTable(doc, {
+        startY: 82,
+        head: [['#', 'Student Name', 'Phone', 'Total Due (₹)']],
+        body: students.map((s, i) => [
+          i + 1,
+          s.name,
+          s.phone || '-',
+          s.totalDue || 0,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [27, 58, 107] },
+      });
+
+      // Expenses table
+      const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 120;
+      doc.setFontSize(13);
+      doc.text("Expenses Breakdown", 15, finalY);
+      autoTable(doc, {
+        startY: finalY + 6,
+        head: [['Date', 'Description', 'Amount (₹)']],
+        body: filteredExpenses.map(e => [
+          new Date(e.date).toLocaleDateString('en-IN'),
+          e.description || '-',
+          e.amount || 0,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [192, 57, 43] },
+      });
+
+      doc.save(`Monthly_Report_${months[viewMonth]}_${viewYear}.pdf`);
+    } catch (err) {
+      alert("Monthly Report PDF error!");
+    }
+  };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     try {
@@ -189,29 +238,22 @@ const Dashboard = () => {
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-
-  //---- backup---
-const handleFullBackup = async () => {
+  // ── Backup ──────────────────────────────────────────────────
+  const handleFullBackup = async () => {
     try {
-        // Admin PIN header mein bhejna zaroori hai
-        const res = await API.get('/admin/backup'); 
-        
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.data, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `DidiMess_Backup_${new Date().toLocaleDateString()}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-        
-        alert("✅ Backup Download Ho Gaya! Ise safe rakhein.");
+      const res = await API.get('/admin/backup');
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.data, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute("href", dataStr);
+      a.setAttribute("download", `DidiMess_Backup_${new Date().toLocaleDateString()}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      alert("✅ Backup Download Ho Gaya! Ise safe rakhein.");
     } catch (err) {
-        alert("❌ Backup nahi ho paya. PIN check karein.");
+      alert("❌ Backup nahi ho paya. PIN check karein.");
     }
-};
-
-
-
+  };
 
   // ── Responsive style helpers ──────────────────────────────
   const isMobile = window.innerWidth <= 480;
@@ -221,13 +263,13 @@ const handleFullBackup = async () => {
     padding: '12px 14px',
     borderRadius: 10,
     border: `1.5px solid ${S.border}`,
-    fontSize: 15,           // slightly bigger — easier to tap
+    fontSize: 16,
     color: S.text,
     background: '#F8FAFF',
     outline: 'none',
     marginBottom: 10,
     boxSizing: 'border-box',
-    WebkitAppearance: 'none', // remove iOS default styling
+    WebkitAppearance: 'none',
   };
 
   const ibtn = (variant) => {
@@ -244,14 +286,13 @@ const handleFullBackup = async () => {
       fontSize: 11,
       fontWeight: 700,
       cursor: 'pointer',
-      // bigger tap target on mobile
       padding: isMobile ? '9px 9px' : '7px 10px',
       display: 'flex',
       alignItems: 'center',
       gap: 3,
       whiteSpace: 'nowrap',
-      minWidth: 32,           // minimum tap size
-      minHeight: 32,
+      minWidth: 36,
+      minHeight: 36,
       justifyContent: 'center',
       ...map[variant],
     };
@@ -291,41 +332,63 @@ const handleFullBackup = async () => {
         * { box-sizing: border-box; }
         body { margin: 0; padding: 0; }
 
-        /* Inputs & selects — prevent iOS zoom (font must be >=16px on focus) */
         input, select, textarea {
           font-size: 16px !important;
           -webkit-text-size-adjust: 100%;
         }
 
-        /* Student card buttons — wrap on very small screens */
         .btn-row {
           display: flex;
           flex-wrap: wrap;
-          gap: 4px;
+          gap: 6px;
           justify-content: flex-end;
+          margin-top: 10px;
         }
 
-        /* Stats grid — 2 columns on very small phones */
         @media (max-width: 360px) {
           .stats-grid {
             grid-template-columns: repeat(2, 1fr) !important;
           }
+          .btn-row button {
+            min-width: 34px !important;
+            min-height: 34px !important;
+            padding: 7px !important;
+          }
         }
 
-        /* Modal scroll on small screens */
         .edit-modal-inner {
           max-height: 90vh;
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
         }
 
-        /* Make date input tap-friendly */
         input[type="date"] {
           min-height: 44px;
         }
 
-        /* Tap highlight removal */
         button { -webkit-tap-highlight-color: transparent; }
+
+        /* Topbar action buttons */
+        .topbar-action {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background: ${S.navyBg};
+          padding: 6px 10px;
+          border-radius: 8px;
+          cursor: pointer;
+          border: none;
+          min-height: 36px;
+        }
+        .topbar-action span {
+          font-size: 10px;
+          font-weight: 700;
+          color: ${S.navy};
+        }
+        @media (max-width: 360px) {
+          .topbar-action span { display: none; }
+          .topbar-action { padding: 6px 8px; }
+        }
       `}</style>
 
       {/* EDIT MODAL */}
@@ -338,7 +401,6 @@ const handleFullBackup = async () => {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '0 16px',
-          // safe area for notch phones
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}>
@@ -349,7 +411,6 @@ const handleFullBackup = async () => {
             width: '100%',
             maxWidth: 420,
           }}>
-            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: S.navy, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Pencil size={15} color={S.purple} /> Edit Student
@@ -386,44 +447,47 @@ const handleFullBackup = async () => {
         </div>
       )}
 
-      {/* TOP BAR */}
+      {/* ── TOP BAR — FIX: all action buttons are now INSIDE the topbar ── */}
       <div style={{
         background: S.white,
-        padding: '16px 16px 13px',
-        paddingTop: 'calc(16px + env(safe-area-inset-top))', // notch safe
+        padding: '0 12px',
+        paddingTop: 'calc(12px + env(safe-area-inset-top))',
+        paddingBottom: '12px',
         borderBottom: `1px solid ${S.border}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 8,
         position: 'sticky',
         top: 0,
         zIndex: 10,
       }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
-        {alerts.length > 0 && <BellRing size={22} color="#ff9800" />}
+        {/* Title */}
+        <div style={{ fontSize: 15, fontWeight: 700, color: S.navy, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          🍱 Didi's Mess
+        </div>
+
+        {/* Action buttons — all inside topbar now */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {/* Backup */}
+          <button className="topbar-action" onClick={handleFullBackup} title="Download Full Backup">
+            <Download size={17} color={S.navy} />
+            <span>BACKUP</span>
+          </button>
+
+          {/* Monthly Report */}
+          <button className="topbar-action" onClick={downloadMonthlyReport} title="Monthly Report">
+            <FileText size={17} color={S.navy} />
+            <span>REPORT</span>
+          </button>
+
+          {/* Bell — only shown when there are alerts */}
+          {alerts.length > 0 && <BellRing size={22} color="#ff9800" />}
+        </div>
       </div>
 
-
-
-
-<div style={{ display: 'flex', gap: 12 }}>
-  {/* Naya Backup Icon */}
-  <div 
-    onClick={handleFullBackup} 
-    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', background: S.navyBg, padding: '4px 8px', borderRadius: '6px' }}
-    title="Download Full Backup"
-  >
-    <Download size={18} color={S.navy} />
-    <span style={{ fontSize: '10px', fontWeight: 'bold', color: S.navy }}>BACKUP</span>
-  </div>
-
-  <FileText size={20} color={S.navy} onClick={downloadMonthlyReport} style={{ cursor: 'pointer' }} title="Monthly Report" />
-  {alerts.length > 0 && <BellRing size={20} color="#ff9800" />}
-</div>
-
-
       {/* MONTH SELECTOR */}
-      <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>
+      <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px 0', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>
         <select
           value={allDaysMode ? 'all' : viewMonth}
           onChange={(e) => {
@@ -445,7 +509,7 @@ const handleFullBackup = async () => {
 
       {/* ALL DAYS — Joining Dates Panel */}
       {allDaysMode && (
-        <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 14, padding: '12px', border: `1px solid ${S.navyBorder}` }}>
+        <div style={{ margin: '10px 12px 0', background: S.white, borderRadius: 14, padding: '12px', border: `1px solid ${S.navyBorder}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>📅 Students Joining Dates</div>
           {students.length === 0 && <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>}
           {students.map(s => (
@@ -464,7 +528,7 @@ const handleFullBackup = async () => {
       )}
 
       {/* STATS CARDS */}
-      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '0 12px 14px' }}>
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '10px 12px 14px' }}>
         <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
           <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
           <div style={{ fontSize: 11, fontWeight: 700, color: S.green }}>₹{totalRevenue}</div>
@@ -536,6 +600,11 @@ const handleFullBackup = async () => {
 
       {/* STUDENT LIST */}
       <div style={{ padding: '0 12px' }}>
+        {filteredStudents.length === 0 && (
+          <div style={{ textAlign: 'center', color: S.muted, fontSize: 14, padding: '24px 0' }}>
+            Koi student nahi mila 🔍
+          </div>
+        )}
         {filteredStudents.map(s => (
           <div key={s._id} style={{
             background: S.white,
@@ -545,27 +614,29 @@ const handleFullBackup = async () => {
             border: `1px solid ${S.border}`,
             borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}`,
           }}>
-            {/* Top row: avatar + name/bill + buttons */}
+            {/* Top row: avatar + name + bill */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {/* Avatar */}
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
                 {getInitials(s.name)}
               </div>
-              {/* Name + Bill */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
                 <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
               </div>
             </div>
 
-            {/* Button row — separate line so buttons don't overflow on small screens */}
-            <div className="btn-row" style={{ marginTop: 10 }}>
-              <button onClick={() => handleCall(s.phone)}    style={ibtn('call')}><Phone   size={14}/></button>
-              <button onClick={() => openEdit(s)}            style={ibtn('edit')}><Pencil  size={14}/></button>
-              <button onClick={() => downloadBill(s)}        style={ibtn('bill')}><Download size={14}/></button>
-              <button onClick={() => sendWelcomeMessage(s)}  style={ibtn('link')}><MessageCircle size={14}/></button>
-              <button onClick={() => handlePay(s._id)}       style={ibtn('paid')}>Paid</button>
-              <button onClick={() => handleDelete(s._id)}    style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 9, cursor: 'pointer', minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Button row */}
+            <div className="btn-row">
+              <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call"><Phone   size={14}/></button>
+              <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit"><Pencil  size={14}/></button>
+              <button onClick={() => downloadBill(s)}       style={ibtn('bill')} title="Bill PDF"><Download size={14}/></button>
+              <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')} title="WhatsApp"><MessageCircle size={14}/></button>
+              <button onClick={() => handlePay(s._id)}      style={ibtn('paid')}>Paid</button>
+              <button
+                onClick={() => handleDelete(s._id)}
+                style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 9, cursor: 'pointer', minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Delete"
+              >
                 <Trash2 size={14}/>
               </button>
             </div>
