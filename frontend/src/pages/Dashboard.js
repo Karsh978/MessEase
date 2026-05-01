@@ -189,6 +189,30 @@ const Dashboard = () => {
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+
+  //---- backup---
+const handleFullBackup = async () => {
+    try {
+        // Admin PIN header mein bhejna zaroori hai
+        const res = await API.get('/admin/backup'); 
+        
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.data, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `DidiMess_Backup_${new Date().toLocaleDateString()}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        
+        alert("✅ Backup Download Ho Gaya! Ise safe rakhein.");
+    } catch (err) {
+        alert("❌ Backup nahi ho paya. PIN check karein.");
+    }
+};
+
+
+
+
   // ── Responsive style helpers ──────────────────────────────
   const isMobile = window.innerWidth <= 480;
 
@@ -378,6 +402,25 @@ const Dashboard = () => {
         <div style={{ fontSize: 16, fontWeight: 700, color: S.navy }}>Didi's Mess Dashboard</div>
         {alerts.length > 0 && <BellRing size={22} color="#ff9800" />}
       </div>
+
+
+
+
+<div style={{ display: 'flex', gap: 12 }}>
+  {/* Naya Backup Icon */}
+  <div 
+    onClick={handleFullBackup} 
+    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', background: S.navyBg, padding: '4px 8px', borderRadius: '6px' }}
+    title="Download Full Backup"
+  >
+    <Download size={18} color={S.navy} />
+    <span style={{ fontSize: '10px', fontWeight: 'bold', color: S.navy }}>BACKUP</span>
+  </div>
+
+  <FileText size={20} color={S.navy} onClick={downloadMonthlyReport} style={{ cursor: 'pointer' }} title="Monthly Report" />
+  {alerts.length > 0 && <BellRing size={20} color="#ff9800" />}
+</div>
+
 
       {/* MONTH SELECTOR */}
       <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>

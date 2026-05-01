@@ -83,7 +83,7 @@ const StudentPortal = () => {
 
   // ✨ NEW: UPI Payment Function
   const handlePayment = () => {
-    const upiId = "6267216334@ybl"; // 👈 Yahan Didi ki UPI ID badal dena baad mein
+    const upiId = "9669168716@ybl"; // 👈 upi pin
     const name = encodeURIComponent("Didi Mess");
     const amount = data.student.totalDue;
     const upiUrl = `upi://pay?pa=${upiId}&pn=${name}&am=${amount}&cu=INR`;

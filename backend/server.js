@@ -322,6 +322,37 @@ app.delete('/api/students/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+
+//-----backup logic----
+// FULL DATABASE BACKUP ROUTE
+app.get('/api/admin/backup', authAdmin, async (req, res) => {
+    try {
+        const students = await Student.find();
+        const attendance = await Attendance.find();
+        // Agar aapke paas Expense model hai toh niche wali line rakhein, nahi toh hata dein
+        const expenses = await mongoose.model('Expense').find(); 
+
+        const backupData = {
+            exportDate: new Date().toLocaleString(),
+            totalStudents: students.length,
+            data: {
+                students,
+                attendance,
+                expenses
+            }
+        };
+
+        res.json(backupData);
+    } catch (err) {
+        res.status(500).json({ error: "Backup fail ho gaya!", details: err.message });
+    }
+});
+
+
+
+
+
 // 5. TEST ROUTE
 app.get('/test', (req, res) => res.send("Server is Working Perfectly!"));
 
