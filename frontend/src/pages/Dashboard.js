@@ -325,16 +325,101 @@ const Dashboard = () => {
   }
 
   return (
-    <div style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
+    <div className="dashboard-root" style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
 
       {/* ── GLOBAL RESPONSIVE CSS ── */}
       <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        html, body {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          max-width: 100vw;
+          overflow-x: hidden;
+        }
+
+        #root, [data-reactroot] {
+          width: 100%;
+          max-width: 100vw;
+          overflow-x: hidden;
+        }
 
         input, select, textarea {
           font-size: 16px !important;
           -webkit-text-size-adjust: 100%;
+          max-width: 100%;
+        }
+
+        .dashboard-root {
+          width: 100%;
+          max-width: 100vw;
+          overflow-x: hidden;
+        }
+
+        .topbar {
+          width: 100%;
+          max-width: 100vw;
+          background: #FFFFFF;
+          padding: 12px 12px;
+          padding-top: calc(12px + env(safe-area-inset-top));
+          border-bottom: 1px solid #E8ECF4;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+
+        .topbar-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #1B3A6B;
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .topbar-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+
+        .topbar-action {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background: #EEF2FA;
+          padding: 6px 10px;
+          border-radius: 8px;
+          cursor: pointer;
+          border: none;
+          min-height: 36px;
+          min-width: 36px;
+        }
+        .topbar-action span {
+          font-size: 10px;
+          font-weight: 700;
+          color: #1B3A6B;
+        }
+
+        .section-pad {
+          padding-left: 12px;
+          padding-right: 12px;
+          width: 100%;
+          max-width: 100vw;
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 6px;
         }
 
         .btn-row {
@@ -345,49 +430,27 @@ const Dashboard = () => {
           margin-top: 10px;
         }
 
-        @media (max-width: 360px) {
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-          .btn-row button {
-            min-width: 34px !important;
-            min-height: 34px !important;
-            padding: 7px !important;
-          }
-        }
-
         .edit-modal-inner {
           max-height: 90vh;
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
         }
 
-        input[type="date"] {
-          min-height: 44px;
-        }
+        input[type="date"] { min-height: 44px; }
 
         button { -webkit-tap-highlight-color: transparent; }
 
-        /* Topbar action buttons */
-        .topbar-action {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          background: ${S.navyBg};
-          padding: 6px 10px;
-          border-radius: 8px;
-          cursor: pointer;
-          border: none;
-          min-height: 36px;
-        }
-        .topbar-action span {
-          font-size: 10px;
-          font-weight: 700;
-          color: ${S.navy};
-        }
-        @media (max-width: 360px) {
-          .topbar-action span { display: none; }
-          .topbar-action { padding: 6px 8px; }
+        /* Small phone tweaks */
+        @media (max-width: 380px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .topbar-action span {
+            display: none;
+          }
+          .topbar-action {
+            padding: 6px 8px;
+          }
         }
       `}</style>
 
@@ -447,28 +510,10 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* ── TOP BAR — FIX: all action buttons are now INSIDE the topbar ── */}
-      <div style={{
-        background: S.white,
-        padding: '0 12px',
-        paddingTop: 'calc(12px + env(safe-area-inset-top))',
-        paddingBottom: '12px',
-        borderBottom: `1px solid ${S.border}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 8,
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}>
-        {/* Title */}
-        <div style={{ fontSize: 15, fontWeight: 700, color: S.navy, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          🍱 Didi's Mess
-        </div>
-
-        {/* Action buttons — all inside topbar now */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+      {/* ── TOP BAR ── */}
+      <div className="topbar">
+        <div className="topbar-title">🍱 Didi's Mess</div>
+        <div className="topbar-actions">
           {/* Backup */}
           <button className="topbar-action" onClick={handleFullBackup} title="Download Full Backup">
             <Download size={17} color={S.navy} />
@@ -487,7 +532,7 @@ const Dashboard = () => {
       </div>
 
       {/* MONTH SELECTOR */}
-      <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px 0', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}` }}>
+      <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px 0', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}`, maxWidth: 'calc(100vw - 24px)', overflow: 'hidden' }}>
         <select
           value={allDaysMode ? 'all' : viewMonth}
           onChange={(e) => {
