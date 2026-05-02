@@ -7,9 +7,10 @@ const cron = require('node-cron');
 // ✅ STEP 1: Config sabse pehle
 dotenv.config();
 
-// ✅ STEP 2: Firebase Admin — USE se PEHLE import aur initialize
+// ✅ STEP 2: Firebase Admin — Environment Variable se initialize (no JSON file needed)
 const admin = require('firebase-admin');
-const serviceAccount = require('./firebase-service-account.json');
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
