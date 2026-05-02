@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { loginStudent, fetchMenu, updateStudentProfile } from '../api';
+import { loginStudent, fetchMenu, updateStudentProfile, API } from '../api';
+import { requestForToken } from '../firebase-config';         // 🔥 FCM import
 import { 
   Utensils, MapPin, Mail, Camera, LogOut, CreditCard, Smartphone 
 } from 'lucide-react';
@@ -68,11 +69,29 @@ const StudentPortal = () => {
         profilePic: res.data.student.profilePic || '',
         email: res.data.student.email || ''
       });
+
+      // 🔥 FCM Token — notification permission maango aur backend mein save karo
+      try {
+        const token = await requestForToken();
+        if (token) {
+          await API.post('/students/save-fcm-token', {
+            studentId: res.data.student._id,
+            token: token,
+          });
+          console.log("✅ FCM token saved successfully");
+        }
+      } catch (fcmErr) {
+        // Token save na ho toh login rok mat — silently log karo
+        console.log("FCM token save failed (non-critical):", fcmErr);
+      }
+
+      // Menu load karo
       try {
         const menuRes = await fetchMenu();
         const todayMenu = menuRes.data.find(m => m.day === todayName);
         setMenu(todayMenu);
       } catch (mErr) { console.log("Menu load failed"); }
+
       setError('');
     } catch (err) {
       setError(err.response?.data?.msg || "Ghalat Number ya PIN!");
@@ -81,14 +100,12 @@ const StudentPortal = () => {
     }
   };
 
-  // ✨ NEW: UPI Payment Function
+  // ✨ UPI Payment Function
   const handlePayment = () => {
-    const upiId = "9669168716@ybl"; // 👈 upi pin
+    const upiId = "9669168716@ybl";
     const name = encodeURIComponent("Didi Mess");
     const amount = data.student.totalDue;
     const upiUrl = `upi://pay?pa=${upiId}&pn=${name}&am=${amount}&cu=INR`;
-    
-    // Mobile par direct apps khul jayenge
     window.location.href = upiUrl;
   };
 
@@ -167,8 +184,6 @@ const StudentPortal = () => {
       <div style={cardStyle('#333', 'none')}>
          <h4 style={{ color: '#ff9800', margin: 0 }}>Total Bill Due</h4>
          <h1 style={{ color: '#fff', fontSize: '32px', margin: '10px 0' }}>₹{data.student.totalDue}</h1>
-         
-         {/* ✨ Naya Pay Now Button (Sirf tab dikhega jab bill > 0 ho) */}
          {data.student.totalDue > 0 && (
            <button 
              onClick={handlePayment}

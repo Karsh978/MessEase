@@ -12,7 +12,8 @@ const studentSchema = new mongoose.Schema({
     totalDue: { type: Number, default: 0 },
       joiningDate: { type: Date, default: Date.now }, 
     joiningDate: { type: Date, default: Date.now },
-    lastPaymentDate: { type: Date, default: Date.now } 
+    lastPaymentDate: { type: Date, default: Date.now } ,
+    fcmToken: String
 });
 
 module.exports = mongoose.model('Student', studentSchema);

@@ -6,3 +6,8 @@ frontend/node_modules/
 backend/.env
 frontend/build/
 .DS_Store
+git rm --cached backend/firebase-service-account.json.json
+
+backend/firebase-service-account.json.json
+backend/*.json
+.env

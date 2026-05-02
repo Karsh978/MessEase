@@ -40,12 +40,18 @@ const Menu = require('./models/Menu');
  const Expense = require('./models/Expense'); 
 
 
+ admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+
 // 4. Routes Import
 const studentRoutes = require('./routes/studentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const menuRoutes = require('./routes/menuRoutes');
-
+const admin = require('firebase-admin');
+const serviceAccount = require("./firebase-service-account.json");
 const sendMail = require('./utils/emailSender');
 
 // 5. Routes Link karein
@@ -255,7 +261,6 @@ cron.schedule('0 10 * * *', async () => {
 });
 
 
-// --- 🥗 SMART MENU DIRECT ROUTES (server.js mein add karein) ---
 
 // 1. Saara menu dekhne ke liye (GET)
 app.get('/api/menu', async (req, res) => {
@@ -283,6 +288,39 @@ app.post('/api/menu/update', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// 1. Student ka FCM Token save karne ke liye
+app.post('/api/students/save-fcm-token', async (req, res) => {
+    try {
+        const { studentId, token } = req.body;
+        await Student.findByIdAndUpdate(studentId, { fcmToken: token });
+        res.json({ msg: "Token saved!" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. BROADCAST NOTIFICATION (Zomato Style)
+app.post('/api/admin/send-notification', authAdmin, async (req, res) => {
+    try {
+        const { title, body } = req.body;
+        const students = await Student.find({ fcmToken: { $exists: true, $ne: "" } });
+        const tokens = students.map(s => s.fcmToken);
+
+        if (tokens.length === 0) return res.status(404).json({ msg: "No students registered for notifications" });
+
+        const message = {
+            notification: { title, body },
+            tokens: tokens,
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(message);
+        res.json({ msg: `Sent to ${response.successCount} students!` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+
 
 //user profile //
 app.put('/api/students/update-profile/:id', async (req, res) => {

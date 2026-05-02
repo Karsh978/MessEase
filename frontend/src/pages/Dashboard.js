@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Pencil, X, Check, FileText } from 'lucide-react';
+import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Pencil, X, Check, FileText, Send, Sparkles } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
@@ -27,6 +27,8 @@ const S = {
   blueBg:      '#E3F2FD',
   purple:      '#7C3AED',
   purpleBg:    '#F3EEFF',
+  orange:      '#E65100',
+  orangeBg:    '#FFF3E0',
 };
 
 const Dashboard = () => {
@@ -48,6 +50,11 @@ const Dashboard = () => {
   const [editEmail, setEditEmail]             = useState('');
   const [editJoiningDate, setEditJoiningDate] = useState('');
 
+  // ── Broadcast State ──────────────────────────────────────
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [mealMsg, setMealMsg]             = useState('');
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+
   const today = new Date();
   const [viewMonth, setViewMonth]     = useState(today.getMonth());
   const [viewYear, setViewYear]       = useState(today.getFullYear());
@@ -56,6 +63,14 @@ const Dashboard = () => {
   const months = [
     "January","February","March","April","May","June",
     "July","August","September","October","November","December"
+  ];
+
+  // Quick message templates
+  const msgTemplates = [
+    { label: '🍛 Aaj ka Menu', text: `🍱 Didi's Mess - Aaj ka Menu\n\n🌅 Breakfast: Poha + Chai\n☀️ Lunch: Dal, Chawal, Sabzi, Roti\n🌙 Dinner: Paneer + Roti + Dal\n\nSabko Namaste! 🙏` },
+    { label: '⚠️ Payment Alert', text: `⚠️ Didi's Mess - Payment Reminder\n\nKripya apna is mahine ka mess bill jald se jald jama karein.\n\nDhanyawad 🙏` },
+    { label: '🎉 Festival', text: `🎉 Didi's Mess ki taraf se aap sabko dher saari shubhkamnayein!\n\nAaj special khana banaya hai. Zaroor aayein! 🍛✨` },
+    { label: '🚫 Closed', text: `🚫 Didi's Mess - Notice\n\nKal mess band rahega. Kripya apna khana arrange kar lein.\n\nAssuvida ke liye khed hai. 🙏` },
   ];
 
   useEffect(() => {
@@ -125,7 +140,6 @@ const Dashboard = () => {
     } catch (err) { alert("PDF Error!"); }
   };
 
-  // ── FIX: downloadMonthlyReport was referenced but never defined ──
   const downloadMonthlyReport = () => {
     try {
       const doc = new jsPDF();
@@ -138,21 +152,14 @@ const Dashboard = () => {
       doc.text(`Net Profit: RS ${netProfit}`, 15, 62);
       doc.text(`Total Students: ${students.length}`, 15, 72);
 
-      // Student-wise dues table
       autoTable(doc, {
         startY: 82,
         head: [['#', 'Student Name', 'Phone', 'Total Due (₹)']],
-        body: students.map((s, i) => [
-          i + 1,
-          s.name,
-          s.phone || '-',
-          s.totalDue || 0,
-        ]),
+        body: students.map((s, i) => [i + 1, s.name, s.phone || '-', s.totalDue || 0]),
         theme: 'grid',
         headStyles: { fillColor: [27, 58, 107] },
       });
 
-      // Expenses table
       const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 120;
       doc.setFontSize(13);
       doc.text("Expenses Breakdown", 15, finalY);
@@ -171,6 +178,26 @@ const Dashboard = () => {
       doc.save(`Monthly_Report_${months[viewMonth]}_${viewYear}.pdf`);
     } catch (err) {
       alert("Monthly Report PDF error!");
+    }
+  };
+
+  // ── Broadcast Handler ────────────────────────────────────
+  const handleBroadcast = async () => {
+    if (!mealMsg.trim()) return alert("Pehle koi message likhein ya template choose karein!");
+
+    setBroadcastLoading(true);
+    try {
+      const res = await API.post('/admin/send-notification', {
+        title: "🍱 Didi's Mess Alert",
+        body: mealMsg,
+      });
+      alert(`✅ Success: ${res.data.msg}`);
+      setMealMsg('');
+      setShowBroadcast(false);
+    } catch (err) {
+      alert("❌ Notification fail ho gaya. Backend check karein.");
+    } finally {
+      setBroadcastLoading(false);
     }
   };
 
@@ -238,7 +265,6 @@ const Dashboard = () => {
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // ── Backup ──────────────────────────────────────────────────
   const handleFullBackup = async () => {
     try {
       const res = await API.get('/admin/backup');
@@ -255,7 +281,6 @@ const Dashboard = () => {
     }
   };
 
-  // ── Responsive style helpers ──────────────────────────────
   const isMobile = window.innerWidth <= 480;
 
   const inp = {
@@ -327,183 +352,119 @@ const Dashboard = () => {
   return (
     <div className="dashboard-root" style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
 
-      {/* ── GLOBAL RESPONSIVE CSS ── */}
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
-
-        html, body {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          max-width: 100vw;
-          overflow-x: hidden;
-        }
-
-        #root, [data-reactroot] {
-          width: 100%;
-          max-width: 100vw;
-          overflow-x: hidden;
-        }
-
-        input, select, textarea {
-          font-size: 16px !important;
-          -webkit-text-size-adjust: 100%;
-          max-width: 100%;
-        }
-
-        .dashboard-root {
-          width: 100%;
-          max-width: 100vw;
-          overflow-x: hidden;
-        }
+        html, body { margin: 0; padding: 0; width: 100%; max-width: 100vw; overflow-x: hidden; }
+        #root, [data-reactroot] { width: 100%; max-width: 100vw; overflow-x: hidden; }
+        input, select, textarea { font-size: 16px !important; -webkit-text-size-adjust: 100%; max-width: 100%; }
+        .dashboard-root { width: 100%; max-width: 100vw; overflow-x: hidden; }
 
         .topbar {
-          width: 100%;
-          max-width: 100vw;
+          width: 100%; max-width: 100vw;
           background: #FFFFFF;
           padding: 12px 12px;
           padding-top: calc(12px + env(safe-area-inset-top));
           border-bottom: 1px solid #E8ECF4;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          position: sticky;
-          top: 0;
-          z-index: 10;
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          position: sticky; top: 0; z-index: 10;
         }
+        .topbar-title { font-size: 15px; font-weight: 700; color: #1B3A6B; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .topbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .topbar-action { display: flex; align-items: center; gap: 4px; background: #EEF2FA; padding: 6px 10px; border-radius: 8px; cursor: pointer; border: none; min-height: 36px; min-width: 36px; }
+        .topbar-action span { font-size: 10px; font-weight: 700; color: #1B3A6B; }
+        .topbar-action-orange { background: #FFF3E0 !important; }
+        .topbar-action-orange span { color: #E65100 !important; }
 
-        .topbar-title {
-          font-size: 15px;
-          font-weight: 700;
-          color: #1B3A6B;
-          flex: 1;
-          min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .topbar-actions {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-shrink: 0;
-        }
-
-        .topbar-action {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          background: #EEF2FA;
-          padding: 6px 10px;
-          border-radius: 8px;
-          cursor: pointer;
-          border: none;
-          min-height: 36px;
-          min-width: 36px;
-        }
-        .topbar-action span {
-          font-size: 10px;
-          font-weight: 700;
-          color: #1B3A6B;
-        }
-
-        .section-pad {
-          padding-left: 12px;
-          padding-right: 12px;
-          width: 100%;
-          max-width: 100vw;
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 6px;
-        }
-
-        .btn-row {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          justify-content: flex-end;
-          margin-top: 10px;
-        }
-
-        .edit-modal-inner {
-          max-height: 90vh;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-
+        .section-pad { padding-left: 12px; padding-right: 12px; width: 100%; max-width: 100vw; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .btn-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+        .edit-modal-inner { max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         input[type="date"] { min-height: 44px; }
-
         button { -webkit-tap-highlight-color: transparent; }
 
-        /* Small phone tweaks */
+        .broadcast-panel {
+          margin: 0 12px 14px;
+          background: ${S.white};
+          border-radius: 16px;
+          padding: 16px;
+          border: 1.5px solid ${S.orange};
+          animation: slideDown 0.25s ease;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .template-chip {
+          display: inline-flex;
+          align-items: center;
+          padding: 6px 10px;
+          border-radius: 20px;
+          border: 1px solid ${S.border};
+          background: ${S.pageBg};
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          color: ${S.text};
+          white-space: nowrap;
+          transition: background 0.15s;
+        }
+        .template-chip:hover { background: ${S.navyBg}; }
+
+        .broadcast-send-btn {
+          width: 100%;
+          padding: 14px;
+          background: linear-gradient(135deg, #E65100, #FF8F00);
+          color: ${S.white};
+          border: none;
+          border-radius: 10px;
+          font-weight: 700;
+          cursor: pointer;
+          font-size: 15px;
+          min-height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .broadcast-send-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
         @media (max-width: 380px) {
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-          .topbar-action span {
-            display: none;
-          }
-          .topbar-action {
-            padding: 6px 8px;
-          }
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .topbar-action span { display: none; }
+          .topbar-action { padding: 6px 8px; }
         }
       `}</style>
 
-      {/* EDIT MODAL */}
+      {/* ── EDIT MODAL ── */}
       {editStudent && (
         <div style={{
           position: 'fixed', inset: 0,
           background: 'rgba(0,0,0,0.55)',
           zIndex: 999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '0 16px',
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}>
-          <div className="edit-modal-inner" style={{
-            background: S.white,
-            borderRadius: 20,
-            padding: 20,
-            width: '100%',
-            maxWidth: 420,
-          }}>
+          <div className="edit-modal-inner" style={{ background: S.white, borderRadius: 20, padding: 20, width: '100%', maxWidth: 420 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: S.navy, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Pencil size={15} color={S.purple} /> Edit Student
               </div>
-              <button
-                onClick={() => setEditStudent(null)}
-                style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, cursor: 'pointer', minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
+              <button onClick={() => setEditStudent(null)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, cursor: 'pointer', minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={16} />
               </button>
             </div>
-
             <input value={editName}  onChange={e => setEditName(e.target.value)}  placeholder="Student name"  style={inp} />
             <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone number"  style={inp} />
             <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email ID"      style={inp} />
-
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 12, color: S.muted, fontWeight: 600, display: 'block', marginBottom: 4 }}>📅 Joining Date</label>
-              <input
-                type="date"
-                value={editJoiningDate}
-                onChange={e => setEditJoiningDate(e.target.value)}
-                style={{ ...inp, marginBottom: 0 }}
-              />
+              <input type="date" value={editJoiningDate} onChange={e => setEditJoiningDate(e.target.value)} style={{ ...inp, marginBottom: 0 }} />
             </div>
-
-            <button
-              onClick={handleEditSave}
-              style={{ width: '100%', padding: 14, background: S.purple, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', marginTop: 14, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48 }}
-            >
+            <button onClick={handleEditSave} style={{ width: '100%', padding: 14, background: S.purple, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', marginTop: 14, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48 }}>
               <Check size={16} /> Save Changes
             </button>
           </div>
@@ -514,6 +475,17 @@ const Dashboard = () => {
       <div className="topbar">
         <div className="topbar-title">🍱 Didi's Mess</div>
         <div className="topbar-actions">
+
+          {/* Broadcast Button */}
+          <button
+            className="topbar-action topbar-action-orange"
+            onClick={() => setShowBroadcast(prev => !prev)}
+            title="Broadcast Notification"
+          >
+            <Send size={17} color={S.orange} />
+            <span>NOTIFY</span>
+          </button>
+
           {/* Backup */}
           <button className="topbar-action" onClick={handleFullBackup} title="Download Full Backup">
             <Download size={17} color={S.navy} />
@@ -526,10 +498,87 @@ const Dashboard = () => {
             <span>REPORT</span>
           </button>
 
-          {/* Bell — only shown when there are alerts */}
           {alerts.length > 0 && <BellRing size={22} color="#ff9800" />}
         </div>
       </div>
+
+      {/* ── BROADCAST PANEL ── */}
+      {showBroadcast && (
+        <div className="broadcast-panel">
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: S.orange, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Send size={15} color={S.orange} /> Broadcast Notification
+            </div>
+            <button
+              onClick={() => { setShowBroadcast(false); setMealMsg(''); }}
+              style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, cursor: 'pointer', minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* Quick Templates */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: S.muted, fontWeight: 600, marginBottom: 6 }}>⚡ Quick Templates:</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {msgTemplates.map((t, i) => (
+                <button
+                  key={i}
+                  className="template-chip"
+                  onClick={() => setMealMsg(t.text)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Message Textarea */}
+          <textarea
+            value={mealMsg}
+            onChange={e => setMealMsg(e.target.value)}
+            placeholder="Yahan apna message likhein... (ya upar se template choose karein)"
+            rows={5}
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: `1.5px solid ${mealMsg ? S.orange : S.border}`,
+              fontSize: 14,
+              color: S.text,
+              background: '#FFFAF5',
+              outline: 'none',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.2s',
+            }}
+          />
+
+          {/* Char count */}
+          <div style={{ fontSize: 10, color: S.muted, textAlign: 'right', marginTop: 3 }}>
+            {mealMsg.length} characters
+          </div>
+
+          {/* Send Button */}
+          <button
+            className="broadcast-send-btn"
+            onClick={handleBroadcast}
+            disabled={broadcastLoading || !mealMsg.trim()}
+          >
+            {broadcastLoading
+              ? <><Loader2 size={16} className="spinning-icon" /> Sending...</>
+              : <><Send size={16} /> Sabko Notification Bhejo ({students.length} students)</>
+            }
+          </button>
+
+          <style>{`
+            .spinning-icon { animation: rotate 1s linear infinite; }
+            @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+          `}</style>
+        </div>
+      )}
 
       {/* MONTH SELECTOR */}
       <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px 0', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}`, maxWidth: 'calc(100vw - 24px)', overflow: 'hidden' }}>
@@ -659,7 +708,6 @@ const Dashboard = () => {
             border: `1px solid ${S.border}`,
             borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}`,
           }}>
-            {/* Top row: avatar + name + bill */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 42, height: 42, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
                 {getInitials(s.name)}
@@ -670,7 +718,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Button row */}
             <div className="btn-row">
               <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call"><Phone   size={14}/></button>
               <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit"><Pencil  size={14}/></button>
