@@ -59,46 +59,38 @@ const StudentPortal = () => {
 
   const handleLogin = async () => {
     if (!phone || !password) return alert("fill-up both phone no and pin!");
-    setIsLoading(true);
+    
+    setIsLoading(true); // Loading shuru
     try {
       const res = await loginStudent({ phone, password });
+      
+      // 1. Pehle data set kar do taaki dashboard turant khul jaye
       setData(res.data);
-      setEditForm({
-        address: res.data.student.address || '',
-        emergencyContact: res.data.student.emergencyContact || '',
-        profilePic: res.data.student.profilePic || '',
-        email: res.data.student.email || ''
-      });
+      setupPortal(res.data); // Aapka purana function jo menu load karta hai
+      
+      setIsLoading(false); // Loading khatam! Dashboard ab dikh jayega
 
-      // 🔥 FCM Token — notification permission maango aur backend mein save karo
+      // 2. Ab CHUPKE SE (Background mein) token mangte hain
+      // Isse agar error bhi aayi toh student ko pata nahi chalega
       try {
-        const token = await requestForToken();
+        console.log("Generating token in background...");
+        const token = await requestForToken(); 
         if (token) {
-          await API.post('/students/save-fcm-token', {
-            studentId: res.data.student._id,
-            token: token,
+          await API.post('/students/save-fcm-token', { 
+            studentId: res.data.student._id, 
+            token: token 
           });
-          console.log("✅ FCM token saved successfully");
+          console.log("Token saved successfully!");
         }
-      } catch (fcmErr) {
-        // Token save na ho toh login rok mat — silently log karo
-        console.log("FCM token save failed (non-critical):", fcmErr);
+      } catch (tokenErr) {
+        console.log("Notification error (ignored):", tokenErr.message);
       }
 
-      // Menu load karo
-      try {
-        const menuRes = await fetchMenu();
-        const todayMenu = menuRes.data.find(m => m.day === todayName);
-        setMenu(todayMenu);
-      } catch (mErr) { console.log("Menu load failed"); }
-
-      setError('');
     } catch (err) {
-      setError(err.response?.data?.msg || "Ghalat Number ya PIN!");
-    } finally {
       setIsLoading(false);
+      setError(err.response?.data?.msg || "Ghalat Number ya PIN!");
     }
-  };
+};
 
   // ✨ UPI Payment Function
   const handlePayment = () => {
