@@ -71,6 +71,47 @@ app.use('/api/menu/update', authAdmin);
 // --- DIRECT ROUTES ---
 // ============================================================
 
+// server.js mein ye hona chahiye:
+
+// 1. Token Save Route
+app.post('/api/students/save-fcm-token', async (req, res) => {
+    try {
+        const { studentId, token } = req.body;
+        const Student = require('./models/Student');
+        await Student.findByIdAndUpdate(studentId, { fcmToken: token });
+        res.json({ msg: "Token saved!" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Notification Send Route (Yahi 404 aa raha hai)
+app.post('/api/admin/send-notification', authAdmin, async (req, res) => {
+    try {
+        const { title, body } = req.body;
+        const Student = require('./models/Student');
+        
+        // Database se tokens nikalo
+        const students = await Student.find({ fcmToken: { $exists: true, $ne: "" } });
+        const tokens = students.map(s => s.fcmToken);
+
+        if (tokens.length === 0) {
+            return res.status(404).json({ msg: "No tokens found in DB" });
+        }
+
+        const message = {
+            notification: { title, body },
+            tokens: tokens,
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(message);
+        res.json({ msg: `Sent to ${response.successCount} students!` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+
+
 // 1. STUDENT PORTAL LOGIN
 app.post('/api/students/portal-login', async (req, res) => {
   try {
@@ -227,36 +268,7 @@ app.post('/api/menu/update', async (req, res) => {
   }
 });
 
-// 10. SAVE FCM TOKEN ✅
-// server.js mein ye do routes bilkul aise hi hone chahiye:
 
-// 1. Token Save karne ke liye
-app.post('/api/students/save-fcm-token', async (req, res) => {
-    try {
-        const { studentId, token } = req.body;
-        await Student.findByIdAndUpdate(studentId, { fcmToken: token });
-        res.json({ msg: "Token saved successfully!" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// 2. Notification bhejne ke liye (Yahi 404 aa raha hai)
-app.post('/api/admin/send-notification', authAdmin, async (req, res) => {
-    try {
-        const { title, body } = req.body;
-        const students = await Student.find({ fcmToken: { $exists: true, $ne: "" } });
-        const tokens = students.map(s => s.fcmToken);
-
-        if (tokens.length === 0) return res.status(404).json({ msg: "No tokens found" });
-
-        const message = { notification: { title, body }, tokens: tokens };
-        const response = await admin.messaging().sendEachForMulticast(message);
-        res.json({ msg: `Sent to ${response.successCount} students!` });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 // 12. UPDATE STUDENT PROFILE
 app.put('/api/students/update-profile/:id', async (req, res) => {

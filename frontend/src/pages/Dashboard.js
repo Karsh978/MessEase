@@ -182,24 +182,21 @@ const Dashboard = () => {
   };
 
   // ── Broadcast Handler ────────────────────────────────────
-  const handleBroadcast = async () => {
-    if (!mealMsg.trim()) return alert("Pehle koi message likhein ya template choose karein!");
-
-    setBroadcastLoading(true);
-    try {
-      const res = await API.post('/admin/send-notification', {
-        title: "🍱 Didi's Mess Alert",
-        body: mealMsg,
-      });
-      alert(`✅ Success: ${res.data.msg}`);
-      setMealMsg('');
-      setShowBroadcast(false);
-    } catch (err) {
-      alert("❌ Notification fail ho gaya. Backend check karein.");
-    } finally {
-      setBroadcastLoading(false);
-    }
-  };
+ const handleBroadcast = async () => {
+  if(!mealMsg) return alert("Pehle Magic Idea generate karein!");
+  
+  try {
+    // API.post use karein jo api.js se aa raha hai
+    const res = await API.post('/admin/send-notification', {
+      title: "🍱 Didi's Mess Alert",
+      body: mealMsg
+    });
+    alert("✅ " + res.data.msg);
+  } catch (err) {
+    console.log(err);
+    alert("❌ Notification failed. Backend check karein.");
+  }
+};
 
   const handleAdd = async (e) => {
     e.preventDefault();
