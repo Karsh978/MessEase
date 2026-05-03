@@ -85,26 +85,18 @@ app.post('/api/admin/send-notification', async (req, res) => {
     try {
         const { title, body } = req.body;
         const Student = require('./models/Student');
-        
-        // Database se tokens nikalo
         const students = await Student.find({ fcmToken: { $exists: true, $ne: "" } });
-        const tokens = students.map(s => s.fcmToken);
-
-        console.log("Tokens found:", tokens.length);
-
-        if (tokens.length === 0) {
-            return res.status(404).json({ msg: "Database mein koi token nahi mila. Student portal par notification ALLOW karein." });
+        
+        if (students.length === 0) {
+            // 404 ki jagah 200 bhej rahe hain taaki error na dikhe
+            return res.json({ msg: "Database mein koi token nahi mila. Student se Notification ALLOW karwaein." });
         }
 
-        const message = {
-            notification: { title, body },
-            tokens: tokens,
-        };
-
+        const tokens = students.map(s => s.fcmToken);
+        const message = { notification: { title, body }, tokens: tokens };
         const response = await admin.messaging().sendEachForMulticast(message);
         res.json({ msg: `Sent to ${response.successCount} students!` });
     } catch (err) {
-        console.error("Firebase Error:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
