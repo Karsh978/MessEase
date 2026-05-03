@@ -187,7 +187,7 @@ const Dashboard = () => {
   
   try {
     // API.post use karein jo api.js se aa raha hai
-    const res = await API.post('/admin/send-notification', {
+    const res = await API.post('https://messease-95bo.onrender.com/api/admin/send-notification', {
       title: "🍱 Didi's Mess Alert",
       body: mealMsg
     });
