@@ -74,17 +74,10 @@ app.use('/api/menu/update', authAdmin);
 // server.js mein ye hona chahiye:
 
 // 1. Token Save Route
-app.post('/api/students/save-fcm-token', async (req, res) => {
-    try {
-        const { studentId, token } = req.body;
-        const Student = require('./models/Student');
-        await Student.findByIdAndUpdate(studentId, { fcmToken: token });
-        res.json({ msg: "Token saved!" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
+// server.js mein yahan paste karein:
 
-// 2. Notification Send Route (Yahi 404 aa raha hai)
-app.post('/api/admin/send-notification', authAdmin, async (req, res) => {
+// 1. Notification Route (Full Path Fix)
+app.post('/api/admin/send-notification', async (req, res) => {
     try {
         const { title, body } = req.body;
         const Student = require('./models/Student');
@@ -93,8 +86,10 @@ app.post('/api/admin/send-notification', authAdmin, async (req, res) => {
         const students = await Student.find({ fcmToken: { $exists: true, $ne: "" } });
         const tokens = students.map(s => s.fcmToken);
 
+        console.log("Tokens found:", tokens.length);
+
         if (tokens.length === 0) {
-            return res.status(404).json({ msg: "No tokens found in DB" });
+            return res.status(404).json({ msg: "Database mein koi token nahi mila. Student portal par notification ALLOW karein." });
         }
 
         const message = {
@@ -105,11 +100,22 @@ app.post('/api/admin/send-notification', authAdmin, async (req, res) => {
         const response = await admin.messaging().sendEachForMulticast(message);
         res.json({ msg: `Sent to ${response.successCount} students!` });
     } catch (err) {
+        console.error("Firebase Error:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-
+// 2. Token Save Route (Full Path Fix)
+app.post('/api/students/save-fcm-token', async (req, res) => {
+    try {
+        const { studentId, token } = req.body;
+        const Student = require('./models/Student');
+        await Student.findByIdAndUpdate(studentId, { fcmToken: token });
+        res.json({ msg: "Token saved!" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 
 // 1. STUDENT PORTAL LOGIN
