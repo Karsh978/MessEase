@@ -57,48 +57,28 @@ const StudentPortal = () => {
 
   const todayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date().getDay()];
 
-  const handleLogin = async () => {
-    if (!phone || !password) return alert("fill-up both phone no and pin!");
-    setIsLoading(true);
-    try {
-      const res = await loginStudent({ phone, password });
-      setData(res.data);
-      setEditForm({
-        address: res.data.student.address || '',
-        emergencyContact: res.data.student.emergencyContact || '',
-        profilePic: res.data.student.profilePic || '',
-        email: res.data.student.email || ''
+ const handleLogin = async () => {
+  try {
+    const res = await loginStudent({ phone, password });
+    setData(res.data);
+
+    // 🔍 Debugging: Check karo permission mil rahi hai ya nahi
+    console.log("Requesting permission...");
+    const token = await requestForToken(); 
+    
+    if (token) {
+      console.log("Token generated:", token);
+      await API.post('/students/save-fcm-token', { 
+        studentId: res.data.student._id, 
+        token: token 
       });
-
-      // 🔥 FCM Token — notification permission maango aur backend mein save karo
-      try {
-        const token = await requestForToken();
-        if (token) {
-          await API.post('/students/save-fcm-token', {
-            studentId: res.data.student._id,
-            token: token,
-          });
-          console.log("✅ FCM token saved successfully");
-        }
-      } catch (fcmErr) {
-        // Token save na ho toh login rok mat — silently log karo
-        console.log("FCM token save failed (non-critical):", fcmErr);
-      }
-
-      // Menu load karo
-      try {
-        const menuRes = await fetchMenu();
-        const todayMenu = menuRes.data.find(m => m.day === todayName);
-        setMenu(todayMenu);
-      } catch (mErr) { console.log("Menu load failed"); }
-
-      setError('');
-    } catch (err) {
-      setError(err.response?.data?.msg || "Ghalat Number ya PIN!");
-    } finally {
-      setIsLoading(false);
+    } else {
+      alert("Notification permission nahi mili! Please browser settings mein Allow karein.");
     }
-  };
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   // ✨ UPI Payment Function
   const handlePayment = () => {
