@@ -3,44 +3,40 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const cron = require('node-cron');
+const admin = require('firebase-admin'); // ✅ Step 1: Sabse pehle import
 
-// ✅ STEP 1: Config sabse pehle
+// ✅ Step 2: Config
 dotenv.config();
 
-// ✅ STEP 2: Firebase Admin — Environment Variable se initialize (no JSON file needed)
-const admin = require('firebase-admin');
+// ✅ Step 3: Firebase Admin Initialize (env variable se, koi JSON file nahi)
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("✅ Firebase Admin Initialized!");
+  } else {
+    console.log("⚠️ FIREBASE_SERVICE_ACCOUNT env variable missing!");
+  }
+} catch (error) {
+  console.error("❌ Firebase Init Error:", error.message);
+}
 
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
-
-console.log("✅ Firebase Admin initialized!");
-
-// ✅ STEP 3: Express app
+// ✅ Step 4: Express App
 const app = express();
 
-// ✅ STEP 4: Sirf EK baar MongoDB connect
+// ✅ Step 5: MongoDB — sirf EK baar
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ Didi's Mess Database Connected!"))
   .catch((err) => console.log("❌ DB Connection Error:", err));
 
-// ✅ STEP 5: Middleware
+// ✅ Step 6: Middleware
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
-// ✅ STEP 6: Models
-const Student    = require('./models/Student');
-const Attendance = require('./models/Attendance');
-const Menu       = require('./models/Menu');
-const Expense    = require('./models/Expense');
-
-// ✅ STEP 7: Utils
-const sendMail = require('./utils/emailSender');
-
-// ✅ STEP 8: Admin PIN Auth Middleware
+// ✅ Step 7: Admin PIN Auth
 const ADMIN_PIN = process.env.ADMIN_PIN;
 const authAdmin = (req, res, next) => {
   const pin = req.headers['admin-pin'];
@@ -51,7 +47,16 @@ const authAdmin = (req, res, next) => {
   }
 };
 
-// ✅ STEP 9: Route files
+// ✅ Step 8: Models
+const Student    = require('./models/Student');
+const Attendance = require('./models/Attendance');
+const Menu       = require('./models/Menu');
+const Expense    = require('./models/Expense');
+
+// ✅ Step 9: Utils
+const sendMail = require('./utils/emailSender');
+
+// ✅ Step 10: Route Files
 const studentRoutes    = require('./routes/studentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const expenseRoutes    = require('./routes/expenseRoutes');
@@ -90,18 +95,18 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
 
     if (!studentId || !date || !mealType) return res.status(400).json({ msg: "Missing data" });
 
-    let record  = await Attendance.findOne({ studentId, date });
+    let record = await Attendance.findOne({ studentId, date });
     if (!record) record = new Attendance({ studentId, date });
 
     const student = await Student.findById(studentId);
     if (!student) return res.status(404).json({ msg: "Student not found" });
 
     if (record[mealType]) {
-      record[mealType]   = false;
-      student.totalDue   = Math.max(0, (student.totalDue || 0) - rates[mealType]);
+      record[mealType] = false;
+      student.totalDue = Math.max(0, (student.totalDue || 0) - rates[mealType]);
     } else {
-      record[mealType]   = true;
-      student.totalDue   = (student.totalDue || 0) + rates[mealType];
+      record[mealType] = true;
+      student.totalDue = (student.totalDue || 0) + rates[mealType];
     }
 
     await record.save();
@@ -142,7 +147,7 @@ app.post('/api/students/send-email-reminder', async (req, res) => {
 app.get('/api/students/alerts', async (req, res) => {
   try {
     const allStudents = await Student.find({});
-    const today       = new Date();
+    const today = new Date();
 
     const alerts = allStudents.map(s => {
       const startDate = s.lastPaymentDate || s.joiningDate || today;
@@ -175,7 +180,7 @@ app.get('/api/students/bill-summary/:id', async (req, res) => {
 app.post('/api/attendance/mark-all', async (req, res) => {
   try {
     const { date, mealType } = req.body;
-    const rates = { breakfast: 25, lunch: 50, dinner: 50 };
+    const rates    = { breakfast: 25, lunch: 50, dinner: 50 };
     const students = await Student.find();
 
     if (!students || students.length === 0) return res.status(404).json({ msg: "No students found" });
@@ -185,8 +190,8 @@ app.post('/api/attendance/mark-all', async (req, res) => {
       if (!record) record = new Attendance({ studentId: student._id, date });
 
       if (record[mealType] !== true) {
-        record[mealType]  = true;
-        student.totalDue  = (student.totalDue || 0) + rates[mealType];
+        record[mealType] = true;
+        student.totalDue = (student.totalDue || 0) + rates[mealType];
         await record.save();
         await student.save();
       }
@@ -194,6 +199,7 @@ app.post('/api/attendance/mark-all', async (req, res) => {
 
     res.json({ msg: "Success! Sabka attendance lag gaya." });
   } catch (err) {
+    console.error("CRASH ERROR IN MARK-ALL:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -212,7 +218,9 @@ app.get('/api/menu', async (req, res) => {
 app.post('/api/menu/update', async (req, res) => {
   try {
     const { day, dish, ingredients } = req.body;
-    const updated = await Menu.findOneAndUpdate({ day }, { dish, ingredients }, { upsert: true, new: true });
+    const updated = await Menu.findOneAndUpdate(
+      { day }, { dish, ingredients }, { upsert: true, new: true }
+    );
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -238,29 +246,26 @@ app.post('/api/admin/send-notification', authAdmin, async (req, res) => {
   try {
     const { title, body } = req.body;
 
-    // Sirf unhe bhejo jinke paas valid token hai
     const students = await Student.find({
       fcmToken: { $exists: true, $ne: null, $ne: "" }
     });
 
     if (students.length === 0) {
-      return res.status(404).json({ msg: "Koi bhi student notifications ke liye registered nahi hai. Pehle students ko login karwayen." });
+      return res.status(404).json({
+        msg: "Koi bhi student notifications ke liye registered nahi hai. Pehle students ko login karwayen."
+      });
     }
 
     const tokens = students.map(s => s.fcmToken);
-    console.log(`📤 Sending notification to ${tokens.length} students...`);
+    console.log(`📤 Sending to ${tokens.length} students...`);
 
-    const message = {
+    const response = await admin.messaging().sendEachForMulticast({
       notification: { title, body },
-      tokens: tokens,
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(message);
-    console.log(`✅ Success: ${response.successCount}, ❌ Failed: ${response.failureCount}`);
-
-    res.json({
-      msg: `✅ ${response.successCount} students ko notification gayi! (${response.failureCount} failed)`
+      tokens,
     });
+
+    console.log(`✅ Success: ${response.successCount}, ❌ Failed: ${response.failureCount}`);
+    res.json({ msg: `✅ ${response.successCount} students ko notification gayi! (${response.failureCount} failed)` });
   } catch (err) {
     console.error("🔴 Notification error:", err.message);
     res.status(500).json({ error: err.message });
@@ -312,7 +317,7 @@ app.get('/api/admin/backup', authAdmin, async (req, res) => {
 });
 
 // ============================================================
-// --- AUTO EMAIL CRON (Roz subah 10 baje) ---
+// AUTO EMAIL CRON (Roz subah 10 baje)
 // ============================================================
 cron.schedule('0 10 * * *', async () => {
   try {
