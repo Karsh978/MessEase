@@ -228,48 +228,34 @@ app.post('/api/menu/update', async (req, res) => {
 });
 
 // 10. SAVE FCM TOKEN ✅
-app.post('/api/students/save-fcm-token', async (req, res) => {
-  try {
-    const { studentId, token } = req.body;
-    if (!studentId || !token) return res.status(400).json({ msg: "studentId aur token dono chahiye!" });
+// server.js mein ye do routes bilkul aise hi hone chahiye:
 
-    await Student.findByIdAndUpdate(studentId, { fcmToken: token });
-    console.log(`✅ FCM token saved for student: ${studentId}`);
-    res.json({ msg: "Token saved!" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// 1. Token Save karne ke liye
+app.post('/api/students/save-fcm-token', async (req, res) => {
+    try {
+        const { studentId, token } = req.body;
+        await Student.findByIdAndUpdate(studentId, { fcmToken: token });
+        res.json({ msg: "Token saved successfully!" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// 11. BROADCAST NOTIFICATION ✅
+// 2. Notification bhejne ke liye (Yahi 404 aa raha hai)
 app.post('/api/admin/send-notification', authAdmin, async (req, res) => {
-  try {
-    const { title, body } = req.body;
+    try {
+        const { title, body } = req.body;
+        const students = await Student.find({ fcmToken: { $exists: true, $ne: "" } });
+        const tokens = students.map(s => s.fcmToken);
 
-    const students = await Student.find({
-      fcmToken: { $exists: true, $ne: null, $ne: "" }
-    });
+        if (tokens.length === 0) return res.status(404).json({ msg: "No tokens found" });
 
-    if (students.length === 0) {
-      return res.status(404).json({
-        msg: "Koi bhi student notifications ke liye registered nahi hai. Pehle students ko login karwayen."
-      });
+        const message = { notification: { title, body }, tokens: tokens };
+        const response = await admin.messaging().sendEachForMulticast(message);
+        res.json({ msg: `Sent to ${response.successCount} students!` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-
-    const tokens = students.map(s => s.fcmToken);
-    console.log(`📤 Sending to ${tokens.length} students...`);
-
-    const response = await admin.messaging().sendEachForMulticast({
-      notification: { title, body },
-      tokens,
-    });
-
-    console.log(`✅ Success: ${response.successCount}, ❌ Failed: ${response.failureCount}`);
-    res.json({ msg: `✅ ${response.successCount} students ko notification gayi! (${response.failureCount} failed)` });
-  } catch (err) {
-    console.error("🔴 Notification error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // 12. UPDATE STUDENT PROFILE

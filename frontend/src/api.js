@@ -31,3 +31,5 @@ export const toggleMealAttendance = (data) => API.post('/attendance/toggle-meal'
 export const updateStudentProfile = (id, data) => API.put(`/students/update-profile/${id}`, data);
 
 export const payFees = (id) => API.post(`/students/pay/${id}`);
+export const saveFCMToken = (data) => API.post('/students/save-fcm-token', data);
+export const sendNotification = (data) => API.post('/admin/send-notification', data);
