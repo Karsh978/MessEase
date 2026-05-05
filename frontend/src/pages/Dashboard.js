@@ -44,6 +44,7 @@ const Dashboard = () => {
   const [password, setPassword]   = useState('1234');
   const [dailyRate, setDailyRate] = useState(0);
 
+  // ── Edit Modal State ─────────────────────────────────────
   const [editStudent, setEditStudent]         = useState(null);
   const [editName, setEditName]               = useState('');
   const [editPhone, setEditPhone]             = useState('');
@@ -51,8 +52,8 @@ const Dashboard = () => {
   const [editJoiningDate, setEditJoiningDate] = useState('');
 
   // ── Broadcast State ──────────────────────────────────────
-  const [showBroadcast, setShowBroadcast] = useState(false);
-  const [mealMsg, setMealMsg]             = useState('');
+  const [showBroadcast, setShowBroadcast]       = useState(false);
+  const [mealMsg, setMealMsg]                   = useState('');
   const [broadcastLoading, setBroadcastLoading] = useState(false);
 
   const today = new Date();
@@ -67,10 +68,10 @@ const Dashboard = () => {
 
   // Quick message templates
   const msgTemplates = [
-    { label: '🍛 Aaj ka Menu', text: `🍱 Didi's Mess - Aaj ka Menu\n\n🌅 Breakfast: Poha + Chai\n☀️ Lunch: Dal, Chawal, Sabzi, Roti\n🌙 Dinner: Paneer + Roti + Dal\n\nSabko Namaste! 🙏` },
+    { label: '🍛 Aaj ka Menu',   text: `🍱 Didi's Mess - Aaj ka Menu\n\n🌅 Breakfast: Poha + Chai\n☀️ Lunch: Dal, Chawal, Sabzi, Roti\n🌙 Dinner: Paneer + Roti + Dal\n\nSabko Namaste! 🙏` },
     { label: '⚠️ Payment Alert', text: `⚠️ Didi's Mess - Payment Reminder\n\nKripya apna is mahine ka mess bill jald se jald jama karein.\n\nDhanyawad 🙏` },
-    { label: '🎉 Festival', text: `🎉 Didi's Mess ki taraf se aap sabko dher saari shubhkamnayein!\n\nAaj special khana banaya hai. Zaroor aayein! 🍛✨` },
-    { label: '🚫 Closed', text: `🚫 Didi's Mess - Notice\n\nKal mess band rahega. Kripya apna khana arrange kar lein.\n\nAssuvida ke liye khed hai. 🙏` },
+    { label: '🎉 Festival',      text: `🎉 Didi's Mess ki taraf se aap sabko dher saari shubhkamnayein!\n\nAaj special khana banaya hai. Zaroor aayein! 🍛✨` },
+    { label: '🚫 Closed',        text: `🚫 Didi's Mess - Notice\n\nKal mess band rahega. Kripya apna khana arrange kar lein.\n\nAssuvida ke liye khed hai. 🙏` },
   ];
 
   useEffect(() => {
@@ -182,21 +183,19 @@ const Dashboard = () => {
   };
 
   // ── Broadcast Handler ────────────────────────────────────
- const handleBroadcast = async () => {
-  if(!mealMsg) return alert("Pehle Magic Idea generate karein!");
-  
-  try {
-    // API.post use karein jo api.js se aa raha hai
-    const res = await API.post('https://messease-95bo.onrender.com/api/admin/send-notification', {
-      title: "🍱 Didi's Mess Alert",
-      body: mealMsg
-    });
-    alert("✅ " + res.data.msg);
-  } catch (err) {
-    console.log(err);
-    alert("❌ Notification failed. Backend check karein.");
-  }
-};
+  const handleBroadcast = async () => {
+    if (!mealMsg) return alert("Pehle message likhein ya template choose karein!");
+    try {
+      const res = await API.post('https://messease-95bo.onrender.com/api/admin/send-notification', {
+        title: "🍱 Didi's Mess Alert",
+        body: mealMsg
+      });
+      alert("✅ " + res.data.msg);
+    } catch (err) {
+      console.log(err);
+      alert("❌ Notification failed. Backend check karein.");
+    }
+  };
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -226,6 +225,7 @@ const Dashboard = () => {
     window.location.href = `tel:${phoneNumber}`;
   };
 
+  // ── Open Edit Modal ──────────────────────────────────────
   const openEdit = (s) => {
     setEditStudent(s);
     setEditName(s.name || '');
@@ -235,16 +235,20 @@ const Dashboard = () => {
     setEditJoiningDate(jd ? new Date(jd).toISOString().split('T')[0] : '');
   };
 
- const handleEditSave = async () => {
+  // ── FIXED: handleEditSave ────────────────────────────────
+  const handleEditSave = async () => {
     try {
       setLoading(true);
-      // Hamare naye backend route ko call karein
-      const res = await API.put(`/students/update-profile/${editingStudent._id}`, editingStudent);
-      
-      if(res.data) {
+      const res = await API.put(`/students/update-profile/${editStudent._id}`, {
+        name: editName,
+        phone: editPhone,
+        email: editEmail,
+        joiningDate: editJoiningDate,
+      });
+      if (res.data) {
         alert("✅ Student details updated successfully!");
-        setEditModalOpen(false);
-        loadData(); // List ko refresh karein
+        setEditStudent(null); // close modal
+        loadData();           // refresh list
       }
     } catch (err) {
       console.error("Update Error:", err.response?.data);
@@ -252,7 +256,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-};
+  };
 
   const filteredExpenses = expenses.filter(e => {
     const d = new Date(e.date);
@@ -281,6 +285,15 @@ const Dashboard = () => {
     } catch (err) {
       alert("❌ Backup nahi ho paya. PIN check karein.");
     }
+  };
+
+  // ── Helper: format joining date ──────────────────────────
+  const formatJoiningDate = (student) => {
+    const raw = student.joiningDate || student.createdAt;
+    if (!raw) return 'N/A';
+    return new Date(raw).toLocaleDateString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
   };
 
   const isMobile = window.innerWidth <= 480;
@@ -386,10 +399,10 @@ const Dashboard = () => {
 
         .broadcast-panel {
           margin: 0 12px 14px;
-          background: ${S.white};
+          background: #FFFFFF;
           border-radius: 16px;
           padding: 16px;
-          border: 1.5px solid ${S.orange};
+          border: 1.5px solid #E65100;
           animation: slideDown 0.25s ease;
         }
         @keyframes slideDown {
@@ -402,22 +415,22 @@ const Dashboard = () => {
           align-items: center;
           padding: 6px 10px;
           border-radius: 20px;
-          border: 1px solid ${S.border};
-          background: ${S.pageBg};
+          border: 1px solid #E8ECF4;
+          background: #F0F4FF;
           font-size: 11px;
           font-weight: 600;
           cursor: pointer;
-          color: ${S.text};
+          color: #1A1A2E;
           white-space: nowrap;
           transition: background 0.15s;
         }
-        .template-chip:hover { background: ${S.navyBg}; }
+        .template-chip:hover { background: #EEF2FA; }
 
         .broadcast-send-btn {
           width: 100%;
           padding: 14px;
           background: linear-gradient(135deg, #E65100, #FF8F00);
-          color: ${S.white};
+          color: #FFFFFF;
           border: none;
           border-radius: 10px;
           font-weight: 700;
@@ -431,6 +444,9 @@ const Dashboard = () => {
           margin-top: 12px;
         }
         .broadcast-send-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .spinning-icon { animation: rotate 1s linear infinite; }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         @media (max-width: 380px) {
           .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -455,18 +471,53 @@ const Dashboard = () => {
               <div style={{ fontSize: 15, fontWeight: 700, color: S.navy, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Pencil size={15} color={S.purple} /> Edit Student
               </div>
-              <button onClick={() => setEditStudent(null)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, cursor: 'pointer', minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button
+                onClick={() => setEditStudent(null)}
+                style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, cursor: 'pointer', minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
                 <X size={16} />
               </button>
             </div>
-            <input value={editName}  onChange={e => setEditName(e.target.value)}  placeholder="Student name"  style={inp} />
-            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone number"  style={inp} />
-            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email ID"      style={inp} />
+
+            <input
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              placeholder="Student name"
+              style={inp}
+            />
+            <input
+              value={editPhone}
+              onChange={e => setEditPhone(e.target.value)}
+              placeholder="Phone number"
+              style={inp}
+            />
+            <input
+              value={editEmail}
+              onChange={e => setEditEmail(e.target.value)}
+              placeholder="Email ID"
+              style={inp}
+            />
             <div style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 12, color: S.muted, fontWeight: 600, display: 'block', marginBottom: 4 }}>📅 Joining Date</label>
-              <input type="date" value={editJoiningDate} onChange={e => setEditJoiningDate(e.target.value)} style={{ ...inp, marginBottom: 0 }} />
+              <label style={{ fontSize: 12, color: S.muted, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                📅 Joining Date
+              </label>
+              <input
+                type="date"
+                value={editJoiningDate}
+                onChange={e => setEditJoiningDate(e.target.value)}
+                style={{ ...inp, marginBottom: 0 }}
+              />
             </div>
-            <button onClick={handleEditSave} style={{ width: '100%', padding: 14, background: S.purple, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', marginTop: 14, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48 }}>
+
+            <button
+              onClick={handleEditSave}
+              style={{
+                width: '100%', padding: 14, background: S.purple, color: S.white,
+                border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer',
+                marginTop: 14, fontSize: 15, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', gap: 6, minHeight: 48
+              }}
+            >
               <Check size={16} /> Save Changes
             </button>
           </div>
@@ -525,11 +576,7 @@ const Dashboard = () => {
             <div style={{ fontSize: 11, color: S.muted, fontWeight: 600, marginBottom: 6 }}>⚡ Quick Templates:</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {msgTemplates.map((t, i) => (
-                <button
-                  key={i}
-                  className="template-chip"
-                  onClick={() => setMealMsg(t.text)}
-                >
+                <button key={i} className="template-chip" onClick={() => setMealMsg(t.text)}>
                   {t.label}
                 </button>
               ))}
@@ -574,16 +621,16 @@ const Dashboard = () => {
               : <><Send size={16} /> Sabko Notification Bhejo ({students.length} students)</>
             }
           </button>
-
-          <style>{`
-            .spinning-icon { animation: rotate 1s linear infinite; }
-            @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-          `}</style>
         </div>
       )}
 
-      {/* MONTH SELECTOR */}
-      <div style={{ display: 'flex', gap: '8px', padding: '12px', margin: '10px 12px 0', background: S.white, borderRadius: '12px', border: `1px solid ${S.border}`, maxWidth: 'calc(100vw - 24px)', overflow: 'hidden' }}>
+      {/* ── MONTH SELECTOR ── */}
+      <div style={{
+        display: 'flex', gap: '8px', padding: '12px',
+        margin: '10px 12px 0', background: S.white,
+        borderRadius: '12px', border: `1px solid ${S.border}`,
+        maxWidth: 'calc(100vw - 24px)', overflow: 'hidden'
+      }}>
         <select
           value={allDaysMode ? 'all' : viewMonth}
           onChange={(e) => {
@@ -603,7 +650,7 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* ALL DAYS — Joining Dates Panel */}
+      {/* ── ALL DAYS — Joining Dates Panel ── */}
       {allDaysMode && (
         <div style={{ margin: '10px 12px 0', background: S.white, borderRadius: 14, padding: '12px', border: `1px solid ${S.navyBorder}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>📅 Students Joining Dates</div>
@@ -611,19 +658,13 @@ const Dashboard = () => {
           {students.map(s => (
             <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 4px', borderBottom: `1px solid ${S.border}` }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: S.text }}>{s.name}</span>
-              <span style={{ fontSize: 12, color: S.muted }}>
-                {s.joiningDate
-                  ? new Date(s.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : s.createdAt
-                  ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : 'N/A'}
-              </span>
+              <span style={{ fontSize: 12, color: S.muted }}>{formatJoiningDate(s)}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* STATS CARDS */}
+      {/* ── STATS CARDS ── */}
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '10px 12px 14px' }}>
         <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
           <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
@@ -643,7 +684,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ALERTS */}
+      {/* ── ALERTS ── */}
       {alerts.length > 0 && (
         <div style={{ margin: '0 12px 14px', background: S.amberBg, borderRadius: 14, padding: '12px', border: `1px solid ${S.amberBorder}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>⚠️ Payment Alerts ({alerts.length})</div>
@@ -664,17 +705,23 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* REGISTER FORM */}
+      {/* ── REGISTER FORM ── */}
       <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <UserPlus size={16} color={S.navy}/> New Registration
+          <UserPlus size={16} color={S.navy} /> New Registration
         </div>
         <form onSubmit={handleAdd}>
           <input value={name}     onChange={e => setName(e.target.value)}     placeholder="Student name"              required style={inp} />
           <input value={phone}    onChange={e => setPhone(e.target.value)}    placeholder="Phone number (Login ID)"   required style={inp} />
           <input value={email}    onChange={e => setEmail(e.target.value)}    placeholder="Email ID (for alerts)"              style={inp} />
-          <input type="password"
-                 value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" required style={inp} />
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Enter Password (e.g. 1234)"
+            required
+            style={inp}
+          />
           <button
             type="submit"
             style={{ width: '100%', padding: 14, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 15, minHeight: 48 }}
@@ -684,7 +731,7 @@ const Dashboard = () => {
         </form>
       </div>
 
-      {/* SEARCH */}
+      {/* ── SEARCH ── */}
       <div style={{ padding: '0 12px 15px' }}>
         <input
           type="text"
@@ -694,13 +741,14 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* STUDENT LIST */}
+      {/* ── STUDENT LIST ── */}
       <div style={{ padding: '0 12px' }}>
         {filteredStudents.length === 0 && (
           <div style={{ textAlign: 'center', color: S.muted, fontSize: 14, padding: '24px 0' }}>
             Koi student nahi mila 🔍
           </div>
         )}
+
         {filteredStudents.map(s => (
           <div key={s._id} style={{
             background: S.white,
@@ -711,27 +759,67 @@ const Dashboard = () => {
             borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}`,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 42, height: 42, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+
+              {/* Avatar */}
+              <div style={{
+                width: 42, height: 42, borderRadius: '50%',
+                background: S.navyBg, color: S.navy,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 14, flexShrink: 0
+              }}>
                 {getInitials(s.name)}
               </div>
+
+              {/* ── Name + Joining Date + Bill ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
-                <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: ₹{s.totalDue}</div>
+                {/* Student Name */}
+                <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: S.text }}>
+                  {s.name}
+                </div>
+
+                {/* ✅ NEW: Joining Date badge right under name */}
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  marginTop: 2,
+                  marginBottom: 2,
+                  background: S.navyBg,
+                  color: S.navy,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '2px 7px',
+                  borderRadius: 20,
+                  border: `1px solid ${S.navyBorder}`,
+                }}>
+                  📅 {formatJoiningDate(s)}
+                </div>
+
+                {/* Bill amount */}
+                <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>
+                  Bill: ₹{s.totalDue}
+                </div>
               </div>
             </div>
 
+            {/* Action Buttons */}
             <div className="btn-row">
-              <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call"><Phone   size={14}/></button>
-              <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit"><Pencil  size={14}/></button>
-              <button onClick={() => downloadBill(s)}       style={ibtn('bill')} title="Bill PDF"><Download size={14}/></button>
-              <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')} title="WhatsApp"><MessageCircle size={14}/></button>
+              <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call">   <Phone         size={14} /></button>
+              <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit">   <Pencil        size={14} /></button>
+              <button onClick={() => downloadBill(s)}       style={ibtn('bill')} title="Bill PDF"><Download      size={14} /></button>
+              <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')} title="WhatsApp"><MessageCircle size={14} /></button>
               <button onClick={() => handlePay(s._id)}      style={ibtn('paid')}>Paid</button>
               <button
                 onClick={() => handleDelete(s._id)}
-                style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 9, cursor: 'pointer', minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{
+                  border: 'none', background: S.redBg, color: S.red,
+                  borderRadius: 8, padding: 9, cursor: 'pointer',
+                  minWidth: 36, minHeight: 36,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
                 title="Delete"
               >
-                <Trash2 size={14}/>
+                <Trash2 size={14} />
               </button>
             </div>
           </div>
