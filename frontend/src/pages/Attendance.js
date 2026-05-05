@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchStudents, toggleMealAttendance, fetchAttendanceStatus, API } from '../api'; 
-import { Sun, SunMedium, Moon, CheckCircle2, Loader2, Lightbulb, LightbulbOff } from 'lucide-react';
+import { Sun, SunMedium, Moon, CheckCircle2, Loader2 } from 'lucide-react';
 
 const Attendance = () => {
   const [students, setStudents] = useState([]);
@@ -9,8 +9,16 @@ const Attendance = () => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Dark mode state
-  const [darkMode, setDarkMode] = useState(false);
+  // Refresh par theme na hate isliye localStorage check kar rahe hain
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return savedTheme === 'dark' ? true : false;
+  });
+
+  // Jab bhi darkMode change ho, use save kar lo
+  useEffect(() => {
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   useEffect(() => {
     loadData();
@@ -42,18 +50,13 @@ const Attendance = () => {
 
     setStatusMap(prev => ({
       ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        [mealType]: !prev[studentId]?.[mealType]
-      }
+      [studentId]: { ...prev[studentId], [mealType]: !prev[studentId]?.[mealType] }
     }));
 
     setStudents(prevStudents => 
       prevStudents.map(s => {
         if (s._id === studentId) {
-          let newTotal = isRemoving 
-            ? (s.totalDue - price) 
-            : (s.totalDue + price);
+          let newTotal = isRemoving ? (s.totalDue - price) : (s.totalDue + price);
           return { ...s, totalDue: Math.max(0, newTotal) };
         }
         return s;
@@ -64,184 +67,129 @@ const Attendance = () => {
       await toggleMealAttendance({ studentId, date, mealType });
     } catch (err) {
       loadData();
-      setMessage("❌ Update nahi hua, dobara try karo");
+      setMessage("❌ Update nahi hua");
       setTimeout(() => setMessage(''), 2000);
     }
   };
 
   const markAll = async (mealType) => {
-    setMessage(`${mealType} sab ke liye mark ho raha hai...`);
+    setMessage(`${mealType} marking...`);
     try {
       await API.post('/attendance/mark-all', { date: date, mealType: mealType });
       setMessage(`✅ Sabka ${mealType} mark ho gaya!`);
       loadData(); 
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
-      setMessage("❌ Nahi ho paya. Backend terminal check karo.");
+      setMessage("❌ Error logic check karo.");
       setTimeout(() => setMessage(''), 3000);
     }
   };
 
-  // --- Dynamic Styles Based on Dark Mode ---
+  // Theme Styles
   const theme = {
-    bg: darkMode ? '#121212' : '#f4f4f9',
-    card: darkMode ? '#1e1e1e' : '#fff',
-    text: darkMode ? '#ffffff' : '#333',
-    subText: darkMode ? '#bbb' : '#666',
+    bg: darkMode ? '#000000' : '#f0f2f5',
+    card: darkMode ? '#1c1c1e' : '#ffffff',
+    text: darkMode ? '#ffffff' : '#1a1a1a',
+    subText: darkMode ? '#a1a1a6' : '#666666',
     border: darkMode ? '#333' : '#ddd',
-    inputBg: darkMode ? '#2d2d2d' : '#fff'
   };
 
   const allBtnStyle = {
     flex: 1,
-    padding: '11px 8px',
-    fontSize: '13px',
-    fontWeight: '500',
+    padding: '12px 5px',
+    fontSize: '12px',
+    fontWeight: 'bold',
     cursor: 'pointer',
-    borderRadius: '8px',
+    borderRadius: '10px',
     color: '#fff',
     background: '#1a73e8',
     border: 'none',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(26,115,232,0.4)',
-    transition: 'all 0.1s',
-    letterSpacing: '0.2px',
+    boxShadow: '0 4px 6px rgba(26,115,232,0.3)',
   };
 
   const getMealBtnStyle = (studentId, mealType) => {
     const isMarked = statusMap[studentId] && statusMap[studentId][mealType];
     return {
-      background: isMarked ? (darkMode ? '#1b5e20' : '#c8e6c9') : (darkMode ? '#2d2d2d' : '#f9f9f9'),
-      border: 'none',
+      background: isMarked ? (darkMode ? '#1e3a1f' : '#e8f5e9') : (darkMode ? '#2c2c2e' : '#f0f0f0'),
+      border: isMarked ? `1px solid ${darkMode ? '#2e7d32' : '#a5d6a7'}` : '1px solid transparent',
       borderRadius: '12px',
       flex: 1,
-      margin: '0 5px',
+      margin: '4px',
       cursor: 'pointer',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: '8px',
-      padding: '18px 8px',
-      boxShadow: isMarked
-        ? `0 5px 0 ${darkMode ? '#0d3d0f' : '#388e3c'}, 0 6px 10px rgba(0,0,0,0.3)`
-        : `0 5px 0 ${darkMode ? '#000' : '#bbb'}, 0 6px 10px rgba(0,0,0,0.1)`,
-      transition: 'box-shadow 0.08s, transform 0.08s',
+      padding: '15px 5px',
+      transition: '0.2s all ease',
+      transform: 'scale(1)',
     };
-  };
-
-  const handleMealMouseDown = (e) => {
-    e.currentTarget.style.transform = 'translateY(3px)';
-    e.currentTarget.style.boxShadow = 'none';
-  };
-
-  const handleMealMouseUp = (e, studentId, mealType) => {
-    const isMarked = statusMap[studentId] && statusMap[studentId][mealType];
-    e.currentTarget.style.boxShadow = isMarked
-      ? `0 5px 0 ${darkMode ? '#0d3d0f' : '#388e3c'}, 0 6px 10px rgba(0,0,0,0.3)`
-      : `0 5px 0 ${darkMode ? '#000' : '#bbb'}, 0 6px 10px rgba(0,0,0,0.1)`;
-    e.currentTarget.style.transform = 'translateY(0)';
   };
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', gap: '15px', background: theme.bg }}>
-        <Loader2 size={50} color="#1a73e8" className="animate-spin" />
-        <p style={{ color: theme.subText, fontWeight: '500' }}>Data load ho raha hai...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } } .animate-spin { animation: spin 1s linear infinite; }`}</style>
+      <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', background: theme.bg, color: theme.text }}>
+        <Loader2 size={40} className="animate-spin" />
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: theme.bg, transition: '0.3s' }}>
-      <div style={{ padding: '10px', maxWidth: '600px', margin: 'auto', paddingBottom: '80px', color: theme.text }}>
+    <div style={{ minHeight: '100vh', background: theme.bg, color: theme.text, transition: '0.3s' }}>
+      <div style={{ maxWidth: '500px', margin: 'auto', padding: '15px' }}>
         
-        {/* Header with Dark Mode Toggle */}
+        {/* Header Section */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0 }}>🍱 Daily Meals</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: '800' }}>🍱 Meal Tracker</h2>
           <button 
             onClick={() => setDarkMode(!darkMode)}
-            style={{ 
-              background: theme.card, border: `1px solid ${theme.border}`, 
-              padding: '8px', borderRadius: '50%', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-            }}
+            style={{ background: theme.card, border: 'none', padding: '10px', borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', cursor: 'pointer' }}
           >
-            {darkMode ? <Sun color="#ffcc00" size={24} /> : <Moon color="#3f51b5" size={24} />}
+            {darkMode ? <Sun color="#ffcc00" size={20} /> : <Moon color="#3f51b5" size={20} />}
           </button>
         </div>
 
-        {/* Date Selector */}
-        <div style={{ background: theme.card, padding: '15px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-          <label style={{ fontSize: '14px', color: theme.subText }}>Tarikh Chunein:</label>
+        {/* Date Selector Box */}
+        <div style={{ background: theme.card, padding: '12px', borderRadius: '15px', marginBottom: '15px' }}>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            style={{ 
-              width: '100%', padding: '10px', marginTop: '5px', 
-              background: theme.inputBg, color: theme.text,
-              border: `1px solid ${theme.border}`, borderRadius: '5px', boxSizing: 'border-box' 
-            }}
+            style={{ width: '100%', padding: '10px', border: 'none', background: 'transparent', color: theme.text, outline: 'none', fontSize: '16px' }}
           />
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
-          <button onClick={() => markAll('breakfast')} style={allBtnStyle}>☀ All Morn</button>
-          <button onClick={() => markAll('lunch')} style={allBtnStyle}>🌤 All Noon</button>
-          <button onClick={() => markAll('dinner')} style={allBtnStyle}>🌙 All Night</button>
+        {/* Mobile Responsive Action Buttons */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+          <button onClick={() => markAll('breakfast')} style={allBtnStyle}>All Morn</button>
+          <button onClick={() => markAll('lunch')} style={allBtnStyle}>All Noon</button>
+          <button onClick={() => markAll('dinner')} style={allBtnStyle}>All Night</button>
         </div>
 
-        {message && (
-          <div style={{ textAlign: 'center', color: message.includes('❌') ? '#ff5252' : '#4caf50', fontWeight: 'bold', marginBottom: '10px' }}>
-            {message}
-          </div>
-        )}
+        {message && <p style={{ textAlign: 'center', color: '#4caf50', fontWeight: 'bold' }}>{message}</p>}
 
-        {/* Student List */}
-        <div style={{ display: 'grid', gap: '12px' }}>
+        {/* Students List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {students.map(s => {
             const sStatus = statusMap[s._id] || {};
             return (
-              <div key={s._id} style={{ background: theme.card, padding: '15px', borderRadius: '15px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '16px' }}>{s.name}</strong>
-                  <span style={{ color: '#4caf50', fontWeight: 'bold', fontSize: '14px' }}>Bill: ₹{s.totalDue}</span>
+              <div key={s._id} style={{ background: theme.card, padding: '15px', borderRadius: '18px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{s.name}</span>
+                  <span style={{ color: '#4caf50', fontWeight: 'bold' }}>₹{s.totalDue}</span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                  <button
-                    onClick={() => toggleMeal(s._id, 'breakfast')}
-                    style={getMealBtnStyle(s._id, 'breakfast')}
-                    onMouseDown={handleMealMouseDown}
-                    onMouseUp={(e) => handleMealMouseUp(e, s._id, 'breakfast')}
-                    onMouseLeave={(e) => handleMealMouseUp(e, s._id, 'breakfast')}
-                  >
-                    {sStatus.breakfast ? <CheckCircle2 size={26} color="#4caf50" /> : <Sun size={26} color="#ff9800" />}
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.breakfast ? '#4caf50' : theme.subText }}>Morn (25)</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <button onClick={() => toggleMeal(s._id, 'breakfast')} style={getMealBtnStyle(s._id, 'breakfast')}>
+                    {sStatus.breakfast ? <CheckCircle2 size={22} color="#4caf50" /> : <Sun size={22} color="#ff9800" />}
+                    <span style={{ fontSize: '10px', marginTop: '5px' }}>Morn</span>
                   </button>
-
-                  <button
-                    onClick={() => toggleMeal(s._id, 'lunch')}
-                    style={getMealBtnStyle(s._id, 'lunch')}
-                    onMouseDown={handleMealMouseDown}
-                    onMouseUp={(e) => handleMealMouseUp(e, s._id, 'lunch')}
-                    onMouseLeave={(e) => handleMealMouseUp(e, s._id, 'lunch')}
-                  >
-                    {sStatus.lunch ? <CheckCircle2 size={26} color="#4caf50" /> : <SunMedium size={26} color="#f44336" />}
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.lunch ? '#4caf50' : theme.subText }}>Noon (50)</span>
+                  <button onClick={() => toggleMeal(s._id, 'lunch')} style={getMealBtnStyle(s._id, 'lunch')}>
+                    {sStatus.lunch ? <CheckCircle2 size={22} color="#4caf50" /> : <SunMedium size={22} color="#f44336" />}
+                    <span style={{ fontSize: '10px', marginTop: '5px' }}>Noon</span>
                   </button>
-
-                  <button
-                    onClick={() => toggleMeal(s._id, 'dinner')}
-                    style={getMealBtnStyle(s._id, 'dinner')}
-                    onMouseDown={handleMealMouseDown}
-                    onMouseUp={(e) => handleMealMouseUp(e, s._id, 'dinner')}
-                    onMouseLeave={(e) => handleMealMouseUp(e, s._id, 'dinner')}
-                  >
-                    {sStatus.dinner ? <CheckCircle2 size={26} color="#4caf50" /> : <Moon size={26} color="#3f51b5" />}
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: sStatus.dinner ? '#4caf50' : theme.subText }}>Night (50)</span>
+                  <button onClick={() => toggleMeal(s._id, 'dinner')} style={getMealBtnStyle(s._id, 'dinner')}>
+                    {sStatus.dinner ? <CheckCircle2 size={22} color="#4caf50" /> : <Moon size={22} color="#3f51b5" />}
+                    <span style={{ fontSize: '10px', marginTop: '5px' }}>Night</span>
                   </button>
                 </div>
               </div>
@@ -249,6 +197,13 @@ const Attendance = () => {
           })}
         </div>
       </div>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: ${darkMode ? 'invert(1)' : 'none'};
+        }
+      `}</style>
     </div>
   );
 };
