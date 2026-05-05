@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Pencil, X, Check, FileText, Send, Sparkles, ArrowUpDown, ChevronDown, Search, Navigation } from 'lucide-react';
+import {
+  UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2,
+  Phone, Pencil, X, Check, FileText, Send, ArrowUpDown,
+  Navigation, Moon, Sun, ArrowUp, TrendingUp, AlertCircle
+} from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
@@ -7,7 +11,8 @@ import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteS
 const getInitials = (name = '') =>
   name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
-const S = {
+// ── Theme Palettes ────────────────────────────────────────
+const LIGHT = {
   navy:        '#1B3A6B',
   navyBg:      '#EEF2FA',
   navyBorder:  '#C6D4ED',
@@ -29,6 +34,38 @@ const S = {
   purpleBg:    '#F3EEFF',
   orange:      '#E65100',
   orangeBg:    '#FFF3E0',
+  topbar:      '#FFFFFF',
+  cardBg:      '#FFFFFF',
+  inputBg:     '#F8FAFF',
+  statBg:      '#FFFFFF',
+};
+
+const DARK = {
+  navy:        '#93B4FF',
+  navyBg:      '#1A2540',
+  navyBorder:  '#2A3A5A',
+  green:       '#4ADE80',
+  greenBg:     '#0D2818',
+  red:         '#FF6B6B',
+  redBg:       '#2A0D0D',
+  amber:       '#FCD34D',
+  amberBg:     '#1F1500',
+  amberBorder: '#4A3500',
+  border:      '#1E2A40',
+  pageBg:      '#0A0F1E',
+  white:       '#0F1629',
+  text:        '#E8EEFF',
+  muted:       '#5A6A8A',
+  blue:        '#60A5FA',
+  blueBg:      '#0D1A2E',
+  purple:      '#A78BFA',
+  purpleBg:    '#1A0F2E',
+  orange:      '#FB923C',
+  orangeBg:    '#1F0D00',
+  topbar:      '#0D1220',
+  cardBg:      '#111827',
+  inputBg:     '#0D1220',
+  statBg:      '#111827',
 };
 
 const Dashboard = () => {
@@ -44,26 +81,41 @@ const Dashboard = () => {
   const [password, setPassword]   = useState('1234');
   const [dailyRate, setDailyRate] = useState(0);
 
-  // ── Edit Modal State ─────────────────────────────────────
+  // Dark Mode
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem('didi_dark') === 'true'; } catch { return false; }
+  });
+  const S = darkMode ? DARK : LIGHT;
+
+  useEffect(() => {
+    try { localStorage.setItem('didi_dark', darkMode); } catch {}
+    document.body.style.background = S.pageBg;
+    document.body.style.color = S.text;
+  }, [darkMode]);
+
+  // Edit Modal
   const [editStudent, setEditStudent]         = useState(null);
   const [editName, setEditName]               = useState('');
   const [editPhone, setEditPhone]             = useState('');
   const [editEmail, setEditEmail]             = useState('');
   const [editJoiningDate, setEditJoiningDate] = useState('');
 
-  // ── Broadcast State ──────────────────────────────────────
+  // Broadcast
   const [showBroadcast, setShowBroadcast]       = useState(false);
   const [mealMsg, setMealMsg]                   = useState('');
   const [broadcastLoading, setBroadcastLoading] = useState(false);
 
-  // ── NEW: Sort State ──────────────────────────────────────
-  const [sortByJoining, setSortByJoining] = useState(false); // toggle joining date ascending sort
+  // Sort
+  const [sortByJoining, setSortByJoining] = useState(false);
 
-  // ── NEW: Jump-to-Student State ───────────────────────────
-  const [showJumpMenu, setShowJumpMenu]   = useState(false);
-  const [jumpSearch, setJumpSearch]       = useState('');
-  const studentRefs = useRef({});          // { studentId: domRef }
+  // Jump to student
+  const [showJumpMenu, setShowJumpMenu] = useState(false);
+  const [jumpSearch, setJumpSearch]     = useState('');
+  const studentRefs = useRef({});
   const jumpInputRef = useRef(null);
+
+  // Scroll to top
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const today = new Date();
   const [viewMonth, setViewMonth]     = useState(today.getMonth());
@@ -75,12 +127,11 @@ const Dashboard = () => {
     "July","August","September","October","November","December"
   ];
 
-  // Quick message templates
   const msgTemplates = [
-    { label: '🍛 Aaj ka Menu',   text: `🍱 Didi's Mess - Aaj ka Menu\n\n🌅 Breakfast: Poha + Chai\n☀️ Lunch: Dal, Chawal, Sabzi, Roti\n🌙 Dinner: Paneer + Roti + Dal\n\nSabko Namaste! 🙏` },
-    { label: '⚠️ Payment Alert', text: `⚠️ Didi's Mess - Payment Reminder\n\nKripya apna is mahine ka mess bill jald se jald jama karein.\n\nDhanyawad 🙏` },
-    { label: '🎉 Festival',      text: `🎉 Didi's Mess ki taraf se aap sabko dher saari shubhkamnayein!\n\nAaj special khana banaya hai. Zaroor aayein! 🍛✨` },
-    { label: '🚫 Closed',        text: `🚫 Didi's Mess - Notice\n\nKal mess band rahega. Kripya apna khana arrange kar lein.\n\nAssuvida ke liye khed hai. 🙏` },
+    { label: 'Aaj ka Menu',   text: "Didi's Mess - Aaj ka Menu\n\nBreakfast: Poha + Chai\nLunch: Dal, Chawal, Sabzi, Roti\nDinner: Paneer + Roti + Dal\n\nSabko Namaste!" },
+    { label: 'Payment Alert', text: "Didi's Mess - Payment Reminder\n\nKripya apna is mahine ka mess bill jald se jald jama karein.\n\nDhanyawad" },
+    { label: 'Festival',      text: "Didi's Mess ki taraf se aap sabko dher saari shubhkamnayein!\n\nAaj special khana banaya hai. Zaroor aayein!" },
+    { label: 'Closed',        text: "Didi's Mess - Notice\n\nKal mess band rahega. Kripya apna khana arrange kar lein.\n\nAssuvida ke liye khed hai." },
   ];
 
   useEffect(() => {
@@ -92,11 +143,16 @@ const Dashboard = () => {
     initLoad();
   }, []);
 
-  // Close jump menu when clicking outside
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   useEffect(() => {
     if (!showJumpMenu) return;
     const handler = (e) => {
-      if (!e.target.closest('.jump-menu-container')) {
+      if (!e.target.closest('.jump-menu-container') && !e.target.closest('.jump-fab-btn')) {
         setShowJumpMenu(false);
         setJumpSearch('');
       }
@@ -105,7 +161,6 @@ const Dashboard = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [showJumpMenu]);
 
-  // Focus jump search input when menu opens
   useEffect(() => {
     if (showJumpMenu && jumpInputRef.current) {
       setTimeout(() => jumpInputRef.current?.focus(), 100);
@@ -128,18 +183,14 @@ const Dashboard = () => {
 
   const sendWelcomeMessage = (student) => {
     const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`;
-    const msg = `Namaste ${student.name}! 🙏\nDidi's Mess mein aapka swagat hai. 🍱\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\n🔗 Link: ${portalURL}\n\n📱 Login ID: ${student.phone}\n🔑 Aapka PIN: ${student.password || '1234'}\n\nKripya is link ko save kar lein. Dhanyawad! ✨`;
+    const msg = `Namaste ${student.name}!\nDidi's Mess mein aapka swagat hai.\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\nLink: ${portalURL}\n\nLogin ID: ${student.phone}\nAapka PIN: ${student.password || '1234'}\n\nKripya is link ko save kar lein. Dhanyawad!`;
     window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   const handleEmailReminder = async (student) => {
     if (!student.email) return alert("email not found!");
     try {
-      await API.post('/students/send-email-reminder', {
-        email: student.email,
-        name: student.name,
-        totalDue: student.totalDue
-      });
+      await API.post('/students/send-email-reminder', { email: student.email, name: student.name, totalDue: student.totalDue });
       alert(`Email sent to ${student.name}!`);
     } catch (err) { alert("Email error!"); }
   };
@@ -181,21 +232,19 @@ const Dashboard = () => {
       doc.text(`Total Expenses: RS ${totalExp}`, 15, 52);
       doc.text(`Net Profit: RS ${netProfit}`, 15, 62);
       doc.text(`Total Students: ${students.length}`, 15, 72);
-
       autoTable(doc, {
         startY: 82,
-        head: [['#', 'Student Name', 'Phone', 'Total Due (₹)']],
+        head: [['#', 'Student Name', 'Phone', 'Total Due (INR)']],
         body: students.map((s, i) => [i + 1, s.name, s.phone || '-', s.totalDue || 0]),
         theme: 'grid',
         headStyles: { fillColor: [27, 58, 107] },
       });
-
       const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 120;
       doc.setFontSize(13);
       doc.text("Expenses Breakdown", 15, finalY);
       autoTable(doc, {
         startY: finalY + 6,
-        head: [['Date', 'Description', 'Amount (₹)']],
+        head: [['Date', 'Description', 'Amount (INR)']],
         body: filteredExpenses.map(e => [
           new Date(e.date).toLocaleDateString('en-IN'),
           e.description || '-',
@@ -204,25 +253,20 @@ const Dashboard = () => {
         theme: 'grid',
         headStyles: { fillColor: [192, 57, 43] },
       });
-
       doc.save(`Monthly_Report_${months[viewMonth]}_${viewYear}.pdf`);
-    } catch (err) {
-      alert("Monthly Report PDF error!");
-    }
+    } catch (err) { alert("Monthly Report PDF error!"); }
   };
 
-  // ── Broadcast Handler ────────────────────────────────────
   const handleBroadcast = async () => {
     if (!mealMsg) return alert("Pehle message likhein ya template choose karein!");
     try {
       const res = await API.post('https://messease-95bo.onrender.com/api/admin/send-notification', {
-        title: "🍱 Didi's Mess Alert",
+        title: "Didi's Mess Alert",
         body: mealMsg
       });
-      alert("✅ " + res.data.msg);
+      alert("Sent! " + res.data.msg);
     } catch (err) {
-      console.log(err);
-      alert("❌ Notification failed. Backend check karein.");
+      alert("Notification failed. Backend check karein.");
     }
   };
 
@@ -250,11 +294,8 @@ const Dashboard = () => {
     }
   };
 
-  const handleCall = (phoneNumber) => {
-    window.location.href = `tel:${phoneNumber}`;
-  };
+  const handleCall = (phoneNumber) => { window.location.href = `tel:${phoneNumber}`; };
 
-  // ── Open Edit Modal ──────────────────────────────────────
   const openEdit = (s) => {
     setEditStudent(s);
     setEditName(s.name || '');
@@ -264,69 +305,33 @@ const Dashboard = () => {
     setEditJoiningDate(jd ? new Date(jd).toISOString().split('T')[0] : '');
   };
 
-  // ── FIXED: handleEditSave ────────────────────────────────
   const handleEditSave = async () => {
     try {
       setLoading(true);
       const res = await API.put(`/students/update-profile/${editStudent._id}`, {
-        name: editName,
-        phone: editPhone,
-        email: editEmail,
-        joiningDate: editJoiningDate,
+        name: editName, phone: editPhone, email: editEmail, joiningDate: editJoiningDate,
       });
       if (res.data) {
-        alert("✅ Student details updated successfully!");
+        alert("Student details updated successfully!");
         setEditStudent(null);
         loadData();
       }
     } catch (err) {
-      console.error("Update Error:", err.response?.data);
-      alert("❌ Update fail ho gaya! Console check karein.");
-    } finally {
-      setLoading(false);
-    }
+      alert("Update fail ho gaya! Console check karein.");
+    } finally { setLoading(false); }
   };
 
-  // ── NEW: Jump to student ─────────────────────────────────
   const handleJumpTo = (studentId) => {
     const el = studentRefs.current[studentId];
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Highlight flash effect
-      el.style.boxShadow = `0 0 0 3px ${S.orange}, 0 4px 20px rgba(230,81,0,0.3)`;
+      el.style.boxShadow = `0 0 0 3px ${S.orange}, 0 4px 20px rgba(230,81,0,0.35)`;
       el.style.transition = 'box-shadow 0.3s ease';
-      setTimeout(() => {
-        el.style.boxShadow = '';
-      }, 2000);
+      setTimeout(() => { el.style.boxShadow = ''; }, 2000);
     }
     setShowJumpMenu(false);
     setJumpSearch('');
   };
-
-  const filteredExpenses = expenses.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-  });
-
-  const totalExp     = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
-  const netProfit    = totalRevenue - totalExp;
-
-  // ── NEW: Apply sort + search ─────────────────────────────
-  const filteredStudents = students
-    .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => {
-      if (!sortByJoining) return 0; // keep original order
-      const dateA = new Date(a.joiningDate || a.createdAt || 0);
-      const dateB = new Date(b.joiningDate || b.createdAt || 0);
-      return dateA - dateB; // ascending
-    });
-
-  // For jump menu: search from ALL students (not filtered by searchTerm)
-  const jumpStudents = students.filter(s =>
-    s.name.toLowerCase().includes(jumpSearch.toLowerCase()) ||
-    (s.phone || '').includes(jumpSearch)
-  );
 
   const handleFullBackup = async () => {
     try {
@@ -338,28 +343,48 @@ const Dashboard = () => {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      alert("✅ Backup Download Ho Gaya! Ise safe rakhein.");
-    } catch (err) {
-      alert("❌ Backup nahi ho paya. PIN check karein.");
-    }
+      alert("Backup Download Ho Gaya!");
+    } catch (err) { alert("Backup nahi ho paya."); }
   };
 
-  // ── Helper: format joining date ──────────────────────────
   const formatJoiningDate = (student) => {
     const raw = student.joiningDate || student.createdAt;
     if (!raw) return 'N/A';
-    return new Date(raw).toLocaleDateString('en-IN', {
-      day: '2-digit', month: 'short', year: 'numeric'
-    });
+    return new Date(raw).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  // ── Helper: get joining month-year label ─────────────────
   const getJoiningMonthLabel = (student) => {
     const raw = student.joiningDate || student.createdAt;
     if (!raw) return '';
     const d = new Date(raw);
     return `${months[d.getMonth()]} ${d.getFullYear()}`;
   };
+
+  const filteredExpenses = expenses.filter(e => {
+    const d = new Date(e.date);
+    return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
+  });
+
+  const totalExp     = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
+  const netProfit    = totalRevenue - totalExp;
+
+  const filteredStudents = students
+    .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      if (!sortByJoining) return 0;
+      return new Date(a.joiningDate || a.createdAt || 0) - new Date(b.joiningDate || b.createdAt || 0);
+    });
+
+  const jumpStudents = students.filter(s =>
+    s.name.toLowerCase().includes(jumpSearch.toLowerCase()) ||
+    (s.phone || '').includes(jumpSearch)
+  );
+
+  const highDueStudents = students.filter(s => s.totalDue > 1500).sort((a, b) => b.totalDue - a.totalDue);
+  const paidCount   = students.filter(s => !s.totalDue || s.totalDue === 0).length;
+  const unpaidCount = students.length - paidCount;
+  const paidPercent = students.length ? Math.round((paidCount / students.length) * 100) : 0;
 
   const isMobile = window.innerWidth <= 480;
 
@@ -370,7 +395,7 @@ const Dashboard = () => {
     border: `1.5px solid ${S.border}`,
     fontSize: 16,
     color: S.text,
-    background: '#F8FAFF',
+    background: S.inputBg,
     outline: 'none',
     marginBottom: 10,
     boxSizing: 'border-box',
@@ -379,57 +404,27 @@ const Dashboard = () => {
 
   const ibtn = (variant) => {
     const map = {
-      bill:   { background: S.navyBg,   color: S.navy   },
-      link:   { background: S.greenBg,  color: S.green  },
-      paid:   { background: S.navy,     color: S.white  },
-      call:   { background: S.blueBg,   color: S.blue   },
-      edit:   { background: S.purpleBg, color: S.purple },
+      bill: { background: S.navyBg,   color: S.navy   },
+      link: { background: S.greenBg,  color: S.green  },
+      paid: { background: S.navy,     color: darkMode ? '#0A0F1E' : '#FFFFFF' },
+      call: { background: S.blueBg,   color: S.blue   },
+      edit: { background: S.purpleBg, color: S.purple },
     };
     return {
-      border: 'none',
-      borderRadius: 8,
-      fontSize: 11,
-      fontWeight: 700,
-      cursor: 'pointer',
-      padding: isMobile ? '9px 9px' : '7px 10px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 3,
-      whiteSpace: 'nowrap',
-      minWidth: 36,
-      minHeight: 36,
-      justifyContent: 'center',
-      ...map[variant],
+      border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700,
+      cursor: 'pointer', padding: isMobile ? '9px 9px' : '7px 10px',
+      display: 'flex', alignItems: 'center', gap: 3,
+      whiteSpace: 'nowrap', minWidth: 36, minHeight: 36,
+      justifyContent: 'center', ...map[variant],
     };
   };
 
   const selectStyle = {
-    padding: '10px',
-    borderRadius: '8px',
-    border: `1px solid ${S.border}`,
-    flex: 1,
-    background: S.white,
-    fontSize: '13px',
-    fontWeight: '600',
-    color: S.navy,
-    WebkitAppearance: 'none',
-    appearance: 'none',
+    padding: '10px', borderRadius: '8px', border: `1px solid ${S.border}`,
+    flex: 1, background: S.cardBg, fontSize: '13px', fontWeight: '600',
+    color: S.navy, WebkitAppearance: 'none', appearance: 'none',
   };
 
-  if (loading) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: S.pageBg }}>
-        <Loader2 size={50} color={S.navy} className="spinning-icon" />
-        <p style={{ marginTop: 15, color: S.navy, fontWeight: 600, fontSize: 16 }}>Didi's Mess loading...</p>
-        <style>{`
-          .spinning-icon { animation: rotate 1s linear infinite; }
-          @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        `}</style>
-      </div>
-    );
-  }
-
-  // ── Group students by joining month when sortByJoining is on ──
   let groupedDisplay = null;
   if (sortByJoining) {
     const groups = {};
@@ -438,260 +433,91 @@ const Dashboard = () => {
       if (!groups[key]) groups[key] = [];
       groups[key].push(s);
     });
-    groupedDisplay = Object.entries(groups); // [ [monthLabel, [students]] ]
+    groupedDisplay = Object.entries(groups);
+  }
+
+  if (loading) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: S.pageBg }}>
+        <div style={{ width: 50, height: 50, border: `4px solid ${S.navyBg}`, borderTop: `4px solid ${S.navy}`, borderRadius: '50%', animation: 'rotate 1s linear infinite' }} />
+        <p style={{ marginTop: 15, color: S.navy, fontWeight: 600, fontSize: 16 }}>Didi's Mess loading...</p>
+        <style>{'@keyframes rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'}</style>
+      </div>
+    );
   }
 
   return (
-    <div className="dashboard-root" style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 120 }}>
-
+    <div
+      className="dashboard-root"
+      style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 130, transition: 'background 0.35s ease', color: S.text }}
+    >
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; width: 100%; max-width: 100vw; overflow-x: hidden; }
-        #root, [data-reactroot] { width: 100%; max-width: 100vw; overflow-x: hidden; }
         input, select, textarea { font-size: 16px !important; -webkit-text-size-adjust: 100%; max-width: 100%; }
         .dashboard-root { width: 100%; max-width: 100vw; overflow-x: hidden; }
+        button { -webkit-tap-highlight-color: transparent; cursor: pointer; }
 
         .topbar {
-          width: 100%; max-width: 100vw;
-          background: #FFFFFF;
-          padding: 12px 12px;
-          padding-top: calc(12px + env(safe-area-inset-top));
-          border-bottom: 1px solid #E8ECF4;
+          width: 100%; background: ${S.topbar};
+          padding: 12px; padding-top: calc(12px + env(safe-area-inset-top));
+          border-bottom: 1px solid ${S.border};
           display: flex; align-items: center; justify-content: space-between; gap: 8px;
-          position: sticky; top: 0; z-index: 10;
+          position: sticky; top: 0; z-index: 100;
+          transition: background 0.35s ease, border-color 0.35s ease;
         }
-        .topbar-title { font-size: 15px; font-weight: 700; color: #1B3A6B; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .topbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-        .topbar-action { display: flex; align-items: center; gap: 4px; background: #EEF2FA; padding: 6px 10px; border-radius: 8px; cursor: pointer; border: none; min-height: 36px; min-width: 36px; }
-        .topbar-action span { font-size: 10px; font-weight: 700; color: #1B3A6B; }
-        .topbar-action-orange { background: #FFF3E0 !important; }
-        .topbar-action-orange span { color: #E65100 !important; }
+        .topbar-title { font-size: 15px; font-weight: 700; color: ${S.navy}; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .topbar-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+        .topbar-action { display: flex; align-items: center; gap: 4px; background: ${S.navyBg}; padding: 6px 10px; border-radius: 8px; border: none; min-height: 36px; }
+        .topbar-action span { font-size: 10px; font-weight: 700; color: ${S.navy}; }
+        .topbar-action-orange { background: ${S.orangeBg} !important; }
+        .topbar-action-orange span { color: ${S.orange} !important; }
 
-        .section-pad { padding-left: 12px; padding-right: 12px; width: 100%; max-width: 100vw; }
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
         .btn-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; margin-top: 10px; }
         .edit-modal-inner { max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         input[type="date"] { min-height: 44px; }
-        button { -webkit-tap-highlight-color: transparent; }
 
-        .broadcast-panel {
-          margin: 0 12px 14px;
-          background: #FFFFFF;
-          border-radius: 16px;
-          padding: 16px;
-          border: 1.5px solid #E65100;
-          animation: slideDown 0.25s ease;
-        }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
+        .broadcast-panel { margin: 0 12px 14px; background: ${S.cardBg}; border-radius: 16px; padding: 16px; border: 1.5px solid ${S.orange}; animation: slideDown .25s ease; }
+        .template-chip { display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 20px; border: 1px solid ${S.border}; background: ${S.navyBg}; font-size: 11px; font-weight: 600; cursor: pointer; color: ${S.text}; white-space: nowrap; }
+        .broadcast-send-btn { width: 100%; padding: 14px; background: linear-gradient(135deg,#E65100,#FF8F00); color: #fff; border: none; border-radius: 10px; font-weight: 700; font-size: 15px; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; }
+        .broadcast-send-btn:disabled { opacity: .6; }
 
-        .template-chip {
-          display: inline-flex;
-          align-items: center;
-          padding: 6px 10px;
-          border-radius: 20px;
-          border: 1px solid #E8ECF4;
-          background: #F0F4FF;
-          font-size: 11px;
-          font-weight: 600;
-          cursor: pointer;
-          color: #1A1A2E;
-          white-space: nowrap;
-          transition: background 0.15s;
-        }
-        .template-chip:hover { background: #EEF2FA; }
+        .sort-banner { margin: 0 12px 10px; background: ${S.purpleBg}; border: 1.5px solid ${darkMode ? '#4C1D95' : '#C4B5FD'}; border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; animation: slideDown .2s ease; }
+        .sort-banner-text { font-size: 11px; font-weight: 700; color: ${S.purple}; display: flex; align-items: center; gap: 5px; }
+        .sort-clear-btn { border: 1px solid ${darkMode ? '#4C1D95' : '#C4B5FD'}; background: ${S.purpleBg}; color: ${S.purple}; border-radius: 6px; padding: 4px 8px; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 3px; }
 
-        .broadcast-send-btn {
-          width: 100%;
-          padding: 14px;
-          background: linear-gradient(135deg, #E65100, #FF8F00);
-          color: #FFFFFF;
-          border: none;
-          border-radius: 10px;
-          font-weight: 700;
-          cursor: pointer;
-          font-size: 15px;
-          min-height: 48px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          margin-top: 12px;
-        }
-        .broadcast-send-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .month-group-header { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; }
+        .month-group-label { font-size: 11px; font-weight: 800; color: ${S.purple}; background: ${S.purpleBg}; border: 1px solid ${darkMode ? '#4C1D95' : '#C4B5FD'}; border-radius: 20px; padding: 3px 10px; white-space: nowrap; }
+        .month-group-line { flex: 1; height: 1px; background: ${darkMode ? '#4C1D95' : '#C4B5FD'}; opacity: .5; }
 
-        .spinning-icon { animation: rotate 1s linear infinite; }
-        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .jump-fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: 16px; z-index: 50; }
+        .jump-fab-btn { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg,#1B3A6B,#2563EB); border: none; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(27,58,107,.4); transition: transform .15s; }
+        .jump-fab-btn:active { transform: scale(.93); }
+        .jump-count-badge { position: absolute; top: -4px; right: -4px; background: #E65100; color: white; font-size: 9px; font-weight: 800; border-radius: 10px; padding: 2px 5px; min-width: 18px; text-align: center; border: 2px solid ${S.pageBg}; }
 
-        /* ── NEW: Sort Banner ── */
-        .sort-banner {
-          margin: 0 12px 10px;
-          background: linear-gradient(135deg, #F3EEFF, #EEF2FA);
-          border: 1.5px solid #C4B5FD;
-          border-radius: 10px;
-          padding: 8px 12px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          animation: slideDown 0.2s ease;
-        }
-        .sort-banner-text { font-size: 11px; font-weight: 700; color: #7C3AED; display: flex; align-items: center; gap: 5px; }
-        .sort-clear-btn { border: none; background: #EDE9FE; color: #7C3AED; border-radius: 6px; padding: 4px 8px; font-size: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 3px; }
+        .jump-menu-container { position: fixed; bottom: calc(84px + env(safe-area-inset-bottom)); right: 12px; z-index: 51; width: min(300px,calc(100vw - 24px)); background: ${S.cardBg}; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,${darkMode ? '.5' : '.15'}); border: 1.5px solid ${S.navyBorder}; overflow: hidden; animation: jumpMenuIn .2s cubic-bezier(.34,1.56,.64,1); }
+        @keyframes jumpMenuIn { from{opacity:0;transform:translateY(12px) scale(.95)} to{opacity:1;transform:translateY(0) scale(1)} }
+        .jump-menu-header { padding: 10px 12px 8px; border-bottom: 1px solid ${S.border}; display: flex; align-items: center; justify-content: space-between; }
+        .jump-menu-title { font-size: 12px; font-weight: 800; color: ${S.navy}; display: flex; align-items: center; gap: 5px; }
+        .jump-search-wrap { padding: 8px 10px; border-bottom: 1px solid ${S.border}; }
+        .jump-search-inp { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid ${S.border}; font-size: 13px; background: ${S.inputBg}; outline: none; color: ${S.text}; box-sizing: border-box; }
+        .jump-search-inp:focus { border-color: ${S.navy}; }
+        .jump-list { max-height: 280px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .jump-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid ${S.border}; }
+        .jump-item:active { background: ${S.navyBg}; }
+        .jump-item-avatar { width: 32px; height: 32px; border-radius: 50%; background: ${S.navyBg}; color: ${S.navy}; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .jump-item-name { font-size: 13px; font-weight: 700; color: ${S.text}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .jump-item-sub { font-size: 10px; color: ${S.muted}; }
+        .jump-empty { padding: 20px; text-align: center; font-size: 13px; color: ${S.muted}; }
 
-        /* ── NEW: Month Group Header ── */
-        .month-group-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin: 12px 0 6px;
-        }
-        .month-group-label {
-          font-size: 11px;
-          font-weight: 800;
-          color: #7C3AED;
-          background: #F3EEFF;
-          border: 1px solid #C4B5FD;
-          border-radius: 20px;
-          padding: 3px 10px;
-          white-space: nowrap;
-          letter-spacing: 0.3px;
-        }
-        .month-group-line {
-          flex: 1;
-          height: 1px;
-          background: #C4B5FD;
-          opacity: 0.4;
-        }
+        .scroll-top-btn { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); left: 16px; z-index: 50; width: 44px; height: 44px; border-radius: 50%; background: ${S.cardBg}; border: 1.5px solid ${S.border}; color: ${S.navy}; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 12px rgba(0,0,0,${darkMode ? '.4' : '.1'}); transition: transform .2s; }
+        .scroll-top-btn:active { transform: scale(.9); }
 
-        /* ── NEW: Floating Jump Button ── */
-        .jump-fab {
-          position: fixed;
-          bottom: calc(24px + env(safe-area-inset-bottom));
-          right: 16px;
-          z-index: 50;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 8px;
-        }
-
-        .jump-btn {
-          width: 52px;
-          height: 52px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #1B3A6B, #2563EB);
-          border: none;
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          box-shadow: 0 4px 16px rgba(27,58,107,0.4);
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        .jump-btn:active { transform: scale(0.93); }
-
-        .jump-count-badge {
-          position: absolute;
-          top: -4px;
-          right: -4px;
-          background: #E65100;
-          color: white;
-          font-size: 9px;
-          font-weight: 800;
-          border-radius: 10px;
-          padding: 2px 5px;
-          min-width: 18px;
-          text-align: center;
-          border: 2px solid white;
-        }
-
-        /* ── NEW: Jump Menu ── */
-        .jump-menu-container {
-          position: fixed;
-          bottom: calc(84px + env(safe-area-inset-bottom));
-          right: 12px;
-          z-index: 51;
-          width: min(300px, calc(100vw - 24px));
-          background: white;
-          border-radius: 16px;
-          box-shadow: 0 8px 32px rgba(27,58,107,0.2), 0 2px 8px rgba(0,0,0,0.08);
-          border: 1.5px solid #C6D4ED;
-          overflow: hidden;
-          animation: jumpMenuIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        @keyframes jumpMenuIn {
-          from { opacity: 0; transform: translateY(12px) scale(0.95); }
-          to   { opacity: 1; transform: translateY(0)   scale(1); }
-        }
-
-        .jump-menu-header {
-          padding: 10px 12px 8px;
-          border-bottom: 1px solid #E8ECF4;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        .jump-menu-title { font-size: 12px; font-weight: 800; color: #1B3A6B; display: flex; align-items: center; gap: 5px; }
-
-        .jump-search-wrap {
-          padding: 8px 10px;
-          border-bottom: 1px solid #E8ECF4;
-        }
-        .jump-search-inp {
-          width: 100%;
-          padding: 8px 10px;
-          border-radius: 8px;
-          border: 1.5px solid #E8ECF4;
-          font-size: 13px;
-          background: #F8FAFF;
-          outline: none;
-          color: #1A1A2E;
-          box-sizing: border-box;
-        }
-        .jump-search-inp:focus { border-color: #1B3A6B; }
-
-        .jump-list {
-          max-height: 280px;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-
-        .jump-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 12px;
-          cursor: pointer;
-          border-bottom: 1px solid #F0F4FF;
-          transition: background 0.12s;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .jump-item:active { background: #EEF2FA; }
-        .jump-item-avatar {
-          width: 32px; height: 32px;
-          border-radius: 50%;
-          background: #EEF2FA;
-          color: #1B3A6B;
-          font-size: 11px;
-          font-weight: 800;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .jump-item-info { flex: 1; min-width: 0; }
-        .jump-item-name { font-size: 13px; font-weight: 700; color: #1A1A2E; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .jump-item-sub { font-size: 10px; color: #8A95B0; }
-        .jump-item-due { font-size: 11px; font-weight: 700; flex-shrink: 0; }
-
-        .jump-empty { padding: 20px; text-align: center; font-size: 13px; color: #8A95B0; }
+        @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes rotate { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        .spinning { animation: rotate 1s linear infinite; }
 
         @media (max-width: 380px) {
-          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .topbar-action span { display: none; }
           .topbar-action { padding: 6px 8px; }
         }
@@ -699,52 +525,24 @@ const Dashboard = () => {
 
       {/* ── EDIT MODAL ── */}
       {editStudent && (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.55)',
-          zIndex: 999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '0 16px',
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}>
-          <div className="edit-modal-inner" style={{ background: S.white, borderRadius: 20, padding: 20, width: '100%', maxWidth: 420 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="edit-modal-inner" style={{ background: S.cardBg, borderRadius: 20, padding: 20, width: '100%', maxWidth: 420, border: `1px solid ${S.border}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: S.navy, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Pencil size={15} color={S.purple} /> Edit Student
               </div>
-              <button
-                onClick={() => setEditStudent(null)}
-                style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, cursor: 'pointer', minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
+              <button onClick={() => setEditStudent(null)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={16} />
               </button>
             </div>
-
-            <input value={editName}  onChange={e => setEditName(e.target.value)}  placeholder="Student name"   style={inp} />
-            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone number"   style={inp} />
-            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email ID"       style={inp} />
+            <input value={editName}  onChange={e => setEditName(e.target.value)}  placeholder="Student name"  style={inp} />
+            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone number"  style={inp} />
+            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email ID"      style={inp} />
             <div style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 12, color: S.muted, fontWeight: 600, display: 'block', marginBottom: 4 }}>
-                📅 Joining Date
-              </label>
-              <input
-                type="date"
-                value={editJoiningDate}
-                onChange={e => setEditJoiningDate(e.target.value)}
-                style={{ ...inp, marginBottom: 0 }}
-              />
+              <label style={{ fontSize: 12, color: S.muted, fontWeight: 600, display: 'block', marginBottom: 4 }}>Joining Date</label>
+              <input type="date" value={editJoiningDate} onChange={e => setEditJoiningDate(e.target.value)} style={{ ...inp, marginBottom: 0 }} />
             </div>
-
-            <button
-              onClick={handleEditSave}
-              style={{
-                width: '100%', padding: 14, background: S.purple, color: S.white,
-                border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer',
-                marginTop: 14, fontSize: 15, display: 'flex', alignItems: 'center',
-                justifyContent: 'center', gap: 6, minHeight: 48
-              }}
-            >
+            <button onClick={handleEditSave} style={{ width: '100%', padding: 14, background: S.purple, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, marginTop: 14, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48 }}>
               <Check size={16} /> Save Changes
             </button>
           </div>
@@ -753,31 +551,56 @@ const Dashboard = () => {
 
       {/* ── TOP BAR ── */}
       <div className="topbar">
-        <div className="topbar-title">🍱 Didi's Mess</div>
+        <div className="topbar-title">Didi's Mess</div>
         <div className="topbar-actions">
 
-          {/* Broadcast Button */}
+          {/* DARK MODE TOGGLE */}
           <button
-            className="topbar-action topbar-action-orange"
-            onClick={() => setShowBroadcast(prev => !prev)}
-            title="Broadcast Notification"
+            onClick={() => setDarkMode(prev => !prev)}
+            title={darkMode ? 'Light Mode' : 'Dark Mode'}
+            style={{
+              border: 'none',
+              background: darkMode ? '#1E293B' : '#E8ECF4',
+              borderRadius: 20,
+              padding: 3,
+              display: 'flex',
+              alignItems: 'center',
+              width: 58,
+              height: 32,
+              position: 'relative',
+              transition: 'background 0.35s ease',
+              flexShrink: 0,
+            }}
           >
-            <Send size={17} color={S.orange} />
-            <span>NOTIFY</span>
+            {/* Track label icons */}
+            <span style={{ position: 'absolute', left: 7, fontSize: 11, opacity: darkMode ? 0 : 1, transition: 'opacity 0.3s' }}>
+              <Sun size={12} color="#1B3A6B" />
+            </span>
+            <span style={{ position: 'absolute', right: 7, fontSize: 11, opacity: darkMode ? 1 : 0, transition: 'opacity 0.3s' }}>
+              <Moon size={12} color="#93B4FF" />
+            </span>
+            {/* Knob */}
+            <div style={{
+              width: 24, height: 24, borderRadius: '50%',
+              background: darkMode ? '#93B4FF' : '#1B3A6B',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1), background 0.35s',
+              transform: `translateX(${darkMode ? '26px' : '0px'})`,
+              zIndex: 1,
+            }}>
+              {darkMode ? <Moon size={13} color="#0A0F1E" /> : <Sun size={13} color="#FFFFFF" />}
+            </div>
           </button>
 
-          {/* Backup */}
-          <button className="topbar-action" onClick={handleFullBackup} title="Download Full Backup">
-            <Download size={17} color={S.navy} />
-            <span>BACKUP</span>
+          <button className="topbar-action topbar-action-orange" onClick={() => setShowBroadcast(prev => !prev)}>
+            <Send size={17} color={S.orange} /><span>NOTIFY</span>
           </button>
-
-          {/* Monthly Report */}
-          <button className="topbar-action" onClick={downloadMonthlyReport} title="Monthly Report">
-            <FileText size={17} color={S.navy} />
-            <span>REPORT</span>
+          <button className="topbar-action" onClick={handleFullBackup}>
+            <Download size={17} color={S.navy} /><span>BACKUP</span>
           </button>
-
+          <button className="topbar-action" onClick={downloadMonthlyReport}>
+            <FileText size={17} color={S.navy} /><span>REPORT</span>
+          </button>
           {alerts.length > 0 && <BellRing size={22} color="#ff9800" />}
         </div>
       </div>
@@ -789,49 +612,27 @@ const Dashboard = () => {
             <div style={{ fontSize: 14, fontWeight: 700, color: S.orange, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Send size={15} color={S.orange} /> Broadcast Notification
             </div>
-            <button
-              onClick={() => { setShowBroadcast(false); setMealMsg(''); }}
-              style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, cursor: 'pointer', minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
+            <button onClick={() => { setShowBroadcast(false); setMealMsg(''); }} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 8, minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <X size={14} />
             </button>
           </div>
-
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, color: S.muted, fontWeight: 600, marginBottom: 6 }}>⚡ Quick Templates:</div>
+            <div style={{ fontSize: 11, color: S.muted, fontWeight: 600, marginBottom: 6 }}>Quick Templates:</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {msgTemplates.map((t, i) => (
-                <button key={i} className="template-chip" onClick={() => setMealMsg(t.text)}>
-                  {t.label}
-                </button>
+                <button key={i} className="template-chip" onClick={() => setMealMsg(t.text)}>{t.label}</button>
               ))}
             </div>
           </div>
-
           <textarea
-            value={mealMsg}
-            onChange={e => setMealMsg(e.target.value)}
-            placeholder="Yahan apna message likhein... (ya upar se template choose karein)"
-            rows={5}
-            style={{
-              width: '100%', padding: '12px 14px', borderRadius: 10,
-              border: `1.5px solid ${mealMsg ? S.orange : S.border}`,
-              fontSize: 14, color: S.text, background: '#FFFAF5', outline: 'none',
-              resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box',
-              transition: 'border-color 0.2s',
-            }}
+            value={mealMsg} onChange={e => setMealMsg(e.target.value)}
+            placeholder="Yahan apna message likhein..." rows={5}
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${mealMsg ? S.orange : S.border}`, fontSize: 14, color: S.text, background: S.inputBg, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color .2s' }}
           />
-          <div style={{ fontSize: 10, color: S.muted, textAlign: 'right', marginTop: 3 }}>
-            {mealMsg.length} characters
-          </div>
-
-          <button
-            className="broadcast-send-btn"
-            onClick={handleBroadcast}
-            disabled={broadcastLoading || !mealMsg.trim()}
-          >
+          <div style={{ fontSize: 10, color: S.muted, textAlign: 'right', marginTop: 3 }}>{mealMsg.length} characters</div>
+          <button className="broadcast-send-btn" onClick={handleBroadcast} disabled={broadcastLoading || !mealMsg.trim()}>
             {broadcastLoading
-              ? <><Loader2 size={16} className="spinning-icon" /> Sending...</>
+              ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'rotate 1s linear infinite' }} /> Sending...</>
               : <><Send size={16} /> Sabko Notification Bhejo ({students.length} students)</>
             }
           </button>
@@ -839,35 +640,23 @@ const Dashboard = () => {
       )}
 
       {/* ── MONTH SELECTOR ── */}
-      <div style={{
-        display: 'flex', gap: '8px', padding: '12px',
-        margin: '10px 12px 0', background: S.white,
-        borderRadius: '12px', border: `1px solid ${S.border}`,
-        maxWidth: 'calc(100vw - 24px)', overflow: 'hidden'
-      }}>
-        <select
-          value={allDaysMode ? 'all' : viewMonth}
-          onChange={(e) => {
-            if (e.target.value === 'all') { setAllDaysMode(true); }
-            else { setAllDaysMode(false); setViewMonth(parseInt(e.target.value)); }
-          }}
-          style={selectStyle}
-        >
-          <option value="all">📋 All Days</option>
+      <div style={{ display: 'flex', gap: 8, padding: 12, margin: '10px 12px 0', background: S.cardBg, borderRadius: 12, border: `1px solid ${S.border}` }}>
+        <select value={allDaysMode ? 'all' : viewMonth} onChange={e => { if (e.target.value === 'all') setAllDaysMode(true); else { setAllDaysMode(false); setViewMonth(parseInt(e.target.value)); } }} style={selectStyle}>
+          <option value="all">All Days</option>
           {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
         </select>
         {!allDaysMode && (
-          <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} style={selectStyle}>
+          <select value={viewYear} onChange={e => setViewYear(parseInt(e.target.value))} style={selectStyle}>
             <option value="2025">2025</option>
             <option value="2026">2026</option>
           </select>
         )}
       </div>
 
-      {/* ── ALL DAYS — Joining Dates Panel ── */}
+      {/* ── ALL DAYS Panel ── */}
       {allDaysMode && (
-        <div style={{ margin: '10px 12px 0', background: S.white, borderRadius: 14, padding: '12px', border: `1px solid ${S.navyBorder}` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>📅 Students Joining Dates</div>
+        <div style={{ margin: '10px 12px 0', background: S.cardBg, borderRadius: 14, padding: 12, border: `1px solid ${S.navyBorder}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: S.navy, marginBottom: 8 }}>Students Joining Dates</div>
           {students.length === 0 && <div style={{ fontSize: 12, color: S.muted }}>Koi student nahi mila.</div>}
           {students.map(s => (
             <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 4px', borderBottom: `1px solid ${S.border}` }}>
@@ -879,39 +668,70 @@ const Dashboard = () => {
       )}
 
       {/* ── STATS CARDS ── */}
-      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '10px 12px 14px' }}>
-        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.green}` }}>
-          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Udhari</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: S.green }}>₹{totalRevenue}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, padding: '10px 12px 6px' }}>
+        {[
+          { label: 'Udhari',   value: `${totalRevenue}`, color: S.green },
+          { label: 'Expense',  value: `${totalExp}`,     color: S.red   },
+          { label: 'Profit',   value: `${netProfit}`,    color: netProfit >= 0 ? S.green : S.red },
+          { label: 'Students', value: `${students.length}`, color: S.blue  },
+        ].map((card, i) => (
+          <div key={i} style={{ background: S.statBg, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${card.color}`, transition: 'background 0.35s' }}>
+            <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase', marginBottom: 3 }}>{card.label}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: card.color }}>{i < 3 ? `Rs ${card.value}` : card.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── ADVANCED: Payment Progress Bar ── */}
+      <div style={{ margin: '6px 12px 0', background: S.cardBg, borderRadius: 12, padding: '10px 12px', border: `1px solid ${S.border}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.text, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <TrendingUp size={12} color={S.green} /> Payment Status
+          </div>
+          <div style={{ fontSize: 10, color: S.muted, fontWeight: 600 }}>
+            {paidCount} Clear / {unpaidCount} Pending
+          </div>
         </div>
-        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.red}` }}>
-          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Expense</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: S.red }}>₹{totalExp}</div>
+        <div style={{ height: 8, borderRadius: 10, background: S.border, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${paidPercent}%`, background: `linear-gradient(90deg,${S.green},#34D399)`, borderRadius: 10, transition: 'width .6s ease' }} />
         </div>
-        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.navy}` }}>
-          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Profit</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: netProfit >= 0 ? S.green : S.red }}>₹{netProfit}</div>
-        </div>
-        <div style={{ background: S.white, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${S.blue}` }}>
-          <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase' }}>Students</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: S.blue }}>{students.length}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+          <span style={{ fontSize: 9, color: S.green, fontWeight: 700 }}>Clear {paidPercent}%</span>
+          <span style={{ fontSize: 9, color: S.red,   fontWeight: 700 }}>Pending {100 - paidPercent}%</span>
         </div>
       </div>
 
+      {/* ── ADVANCED: High Due Alert Chips ── */}
+      {highDueStudents.length > 0 && (
+        <div style={{ margin: '6px 12px 0', background: S.redBg, borderRadius: 14, padding: 12, border: `1.5px solid ${darkMode ? '#4A1515' : '#FFCDD2'}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: S.red, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <AlertCircle size={13} color={S.red} /> Zyada Udhari ({highDueStudents.length}) — Rs 1500+
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {highDueStudents.slice(0, 5).map(s => (
+              <div key={s._id} onClick={() => handleJumpTo(s._id)} style={{ background: S.cardBg, border: `1px solid ${darkMode ? '#4A1515' : '#FFCDD2'}`, borderRadius: 20, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                <span style={{ color: S.text }}>{s.name.split(' ')[0]}</span>
+                <span style={{ color: S.red }}>Rs {s.totalDue}</span>
+              </div>
+            ))}
+            {highDueStudents.length > 5 && (
+              <div style={{ background: S.cardBg, borderRadius: 20, padding: '5px 10px', fontSize: 11, color: S.muted, fontWeight: 700 }}>+{highDueStudents.length - 5} more</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── ALERTS ── */}
       {alerts.length > 0 && (
-        <div style={{ margin: '0 12px 14px', background: S.amberBg, borderRadius: 14, padding: '12px', border: `1px solid ${S.amberBorder}` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>⚠️ Payment Alerts ({alerts.length})</div>
+        <div style={{ margin: '6px 12px 0', background: S.amberBg, borderRadius: 14, padding: 12, border: `1px solid ${S.amberBorder}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: S.amber, marginBottom: 8 }}>Payment Alerts ({alerts.length})</div>
           {alerts.map(s => (
-            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: S.white, padding: '10px', borderRadius: 8, marginBottom: 5, gap: 8 }}>
+            <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: S.cardBg, padding: 10, borderRadius: 8, marginBottom: 5, gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: S.text, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
                 <span style={{ fontSize: 10, color: S.red }}>{s.daysPassed} Days Overdue</span>
               </div>
-              <button
-                onClick={() => handleEmailReminder(s)}
-                style={{ fontSize: 11, background: S.red, border: 'none', color: S.white, fontWeight: 700, padding: '8px 10px', borderRadius: 5, whiteSpace: 'nowrap', minHeight: 36, cursor: 'pointer' }}
-              >
+              <button onClick={() => handleEmailReminder(s)} style={{ fontSize: 11, background: S.red, border: 'none', color: '#fff', fontWeight: 700, padding: '8px 10px', borderRadius: 5, whiteSpace: 'nowrap', minHeight: 36 }}>
                 Alert Email
               </button>
             </div>
@@ -920,26 +740,16 @@ const Dashboard = () => {
       )}
 
       {/* ── REGISTER FORM ── */}
-      <div style={{ margin: '0 12px 14px', background: S.white, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ margin: '8px 12px 14px', background: S.cardBg, borderRadius: 16, padding: 16, border: `1px solid ${S.border}` }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, color: S.text }}>
           <UserPlus size={16} color={S.navy} /> New Registration
         </div>
         <form onSubmit={handleAdd}>
-          <input value={name}     onChange={e => setName(e.target.value)}     placeholder="Student name"              required style={inp} />
-          <input value={phone}    onChange={e => setPhone(e.target.value)}    placeholder="Phone number (Login ID)"   required style={inp} />
-          <input value={email}    onChange={e => setEmail(e.target.value)}    placeholder="Email ID (for alerts)"              style={inp} />
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Enter Password (e.g. 1234)"
-            required
-            style={inp}
-          />
-          <button
-            type="submit"
-            style={{ width: '100%', padding: 14, background: S.navy, color: S.white, border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 15, minHeight: 48 }}
-          >
+          <input value={name}     onChange={e => setName(e.target.value)}     placeholder="Student name"            required style={inp} />
+          <input value={phone}    onChange={e => setPhone(e.target.value)}    placeholder="Phone number (Login ID)" required style={inp} />
+          <input value={email}    onChange={e => setEmail(e.target.value)}    placeholder="Email ID (for alerts)"            style={inp} />
+          <input type="password"  value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" required style={inp} />
+          <button type="submit" style={{ width: '100%', padding: 14, background: S.navy, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, minHeight: 48 }}>
             Register Student
           </button>
         </form>
@@ -949,31 +759,22 @@ const Dashboard = () => {
       <div style={{ padding: '0 12px 10px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           type="text"
-          placeholder="🔍 Search students..."
+          placeholder="Search students..."
           style={{ ...inp, borderRadius: 25, marginBottom: 0, flex: 1 }}
           onChange={e => setSearchTerm(e.target.value)}
         />
-
-        {/* ── NEW: Sort by Joining Date button ── */}
         <button
           onClick={() => setSortByJoining(prev => !prev)}
-          title="Sort by Joining Date"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
+            display: 'flex', alignItems: 'center', gap: 4,
             padding: '10px 12px',
             border: `1.5px solid ${sortByJoining ? S.purple : S.border}`,
             borderRadius: 25,
-            background: sortByJoining ? S.purpleBg : S.white,
+            background: sortByJoining ? S.purpleBg : S.cardBg,
             color: sortByJoining ? S.purple : S.muted,
-            fontWeight: 700,
-            fontSize: 11,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            minHeight: 44,
-            flexShrink: 0,
-            transition: 'all 0.15s ease',
+            fontWeight: 700, fontSize: 11,
+            whiteSpace: 'nowrap', minHeight: 44, flexShrink: 0,
+            transition: 'all .15s ease',
           }}
         >
           <ArrowUpDown size={14} />
@@ -981,12 +782,10 @@ const Dashboard = () => {
         </button>
       </div>
 
-      {/* ── NEW: Sort Active Banner ── */}
       {sortByJoining && (
         <div className="sort-banner">
           <div className="sort-banner-text">
-            <ArrowUpDown size={13} />
-            Joining date ke hisaab se sort kiya (purana → naya)
+            <ArrowUpDown size={13} /> Joining date ke hisaab se sort kiya (purana to naya)
           </div>
           <button className="sort-clear-btn" onClick={() => setSortByJoining(false)}>
             <X size={10} /> Hatao
@@ -997,196 +796,109 @@ const Dashboard = () => {
       {/* ── STUDENT LIST ── */}
       <div style={{ padding: '0 12px' }}>
         {filteredStudents.length === 0 && (
-          <div style={{ textAlign: 'center', color: S.muted, fontSize: 14, padding: '24px 0' }}>
-            Koi student nahi mila 🔍
-          </div>
+          <div style={{ textAlign: 'center', color: S.muted, fontSize: 14, padding: '24px 0' }}>Koi student nahi mila</div>
         )}
 
-        {/* ── Grouped view when sort is ON ── */}
         {sortByJoining && groupedDisplay && groupedDisplay.map(([monthLabel, groupStudents]) => (
           <div key={monthLabel}>
-            {/* Month Group Header */}
             <div className="month-group-header">
               <div className="month-group-line" />
-              <div className="month-group-label">📅 {monthLabel}</div>
+              <div className="month-group-label">{monthLabel}</div>
               <div className="month-group-line" />
             </div>
-
             {groupStudents.map(s => (
-              <StudentCard
-                key={s._id}
-                s={s}
-                studentRefs={studentRefs}
-                formatJoiningDate={formatJoiningDate}
-                S={S}
-                isMobile={isMobile}
-                ibtn={ibtn}
-                handleCall={handleCall}
-                openEdit={openEdit}
-                downloadBill={downloadBill}
-                sendWelcomeMessage={sendWelcomeMessage}
-                handlePay={handlePay}
-                handleDelete={handleDelete}
-              />
+              <StudentCard key={s._id} s={s} studentRefs={studentRefs} formatJoiningDate={formatJoiningDate}
+                S={S} isMobile={isMobile} ibtn={ibtn} handleCall={handleCall} openEdit={openEdit}
+                downloadBill={downloadBill} sendWelcomeMessage={sendWelcomeMessage}
+                handlePay={handlePay} handleDelete={handleDelete} />
             ))}
           </div>
         ))}
 
-        {/* ── Normal view when sort is OFF ── */}
         {!sortByJoining && filteredStudents.map(s => (
-          <StudentCard
-            key={s._id}
-            s={s}
-            studentRefs={studentRefs}
-            formatJoiningDate={formatJoiningDate}
-            S={S}
-            isMobile={isMobile}
-            ibtn={ibtn}
-            handleCall={handleCall}
-            openEdit={openEdit}
-            downloadBill={downloadBill}
-            sendWelcomeMessage={sendWelcomeMessage}
-            handlePay={handlePay}
-            handleDelete={handleDelete}
-          />
+          <StudentCard key={s._id} s={s} studentRefs={studentRefs} formatJoiningDate={formatJoiningDate}
+            S={S} isMobile={isMobile} ibtn={ibtn} handleCall={handleCall} openEdit={openEdit}
+            downloadBill={downloadBill} sendWelcomeMessage={sendWelcomeMessage}
+            handlePay={handlePay} handleDelete={handleDelete} />
         ))}
       </div>
 
-      {/* ── NEW: Jump-to-Student Menu ── */}
+      {/* ── JUMP MENU ── */}
       {showJumpMenu && (
         <div className="jump-menu-container">
           <div className="jump-menu-header">
-            <div className="jump-menu-title">
-              <Navigation size={13} color={S.navy} />
-              Student dhundho
-            </div>
-            <button
-              onClick={() => { setShowJumpMenu(false); setJumpSearch(''); }}
-              style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 6, padding: '4px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
+            <div className="jump-menu-title"><Navigation size={13} color={S.navy} /> Student dhundho</div>
+            <button onClick={() => { setShowJumpMenu(false); setJumpSearch(''); }} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 6, padding: '4px 6px', display: 'flex', alignItems: 'center' }}>
               <X size={13} />
             </button>
           </div>
-
           <div className="jump-search-wrap">
-            <input
-              ref={jumpInputRef}
-              className="jump-search-inp"
-              placeholder="Naam ya phone se search..."
-              value={jumpSearch}
-              onChange={e => setJumpSearch(e.target.value)}
-            />
+            <input ref={jumpInputRef} className="jump-search-inp" placeholder="Naam ya phone se search..." value={jumpSearch} onChange={e => setJumpSearch(e.target.value)} />
           </div>
-
           <div className="jump-list">
-            {jumpStudents.length === 0 && (
-              <div className="jump-empty">Koi student nahi mila 🔍</div>
-            )}
+            {jumpStudents.length === 0 && <div className="jump-empty">Koi student nahi mila</div>}
             {jumpStudents.map(s => (
               <div key={s._id} className="jump-item" onClick={() => handleJumpTo(s._id)}>
                 <div className="jump-item-avatar">{getInitials(s.name)}</div>
-                <div className="jump-item-info">
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="jump-item-name">{s.name}</div>
                   <div className="jump-item-sub">{formatJoiningDate(s)}</div>
                 </div>
-                <div
-                  className="jump-item-due"
-                  style={{ color: s.totalDue > 0 ? S.red : S.green }}
-                >
-                  ₹{s.totalDue}
-                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, color: s.totalDue > 0 ? S.red : S.green }}>Rs {s.totalDue}</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── NEW: Floating Jump Button ── */}
+      {/* ── FLOATING JUMP BUTTON ── */}
       <div className="jump-fab">
         <div style={{ position: 'relative' }}>
-          <button
-            className="jump-btn"
-            onClick={() => setShowJumpMenu(prev => !prev)}
-            title="Kisi bhi student par seedha jaao"
-          >
+          <button className="jump-fab-btn" onClick={() => setShowJumpMenu(prev => !prev)} title="Kisi bhi student par seedha jaao">
             <Navigation size={22} />
           </button>
           <div className="jump-count-badge">{students.length}</div>
         </div>
       </div>
 
+      {/* ── SCROLL TO TOP ── */}
+      {showScrollTop && (
+        <button className="scroll-top-btn" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} title="Upar jaao">
+          <ArrowUp size={18} color={S.navy} />
+        </button>
+      )}
+
     </div>
   );
 };
 
-// ── Extracted StudentCard component to avoid repetition ──
-const StudentCard = ({
-  s, studentRefs, formatJoiningDate, S, isMobile, ibtn,
-  handleCall, openEdit, downloadBill, sendWelcomeMessage, handlePay, handleDelete
-}) => {
-  const getInitials = (name = '') =>
-    name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-
+// ── StudentCard ───────────────────────────────────────────
+const StudentCard = ({ s, studentRefs, formatJoiningDate, S, isMobile, ibtn, handleCall, openEdit, downloadBill, sendWelcomeMessage, handlePay, handleDelete }) => {
+  const initials = (name = '') => name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   return (
     <div
-      key={s._id}
       ref={el => { studentRefs.current[s._id] = el; }}
-      style={{
-        background: S.white,
-        borderRadius: 16,
-        padding: '12px 10px',
-        marginBottom: 10,
-        border: `1px solid ${S.border}`,
-        borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}`,
-        transition: 'box-shadow 0.3s ease',
-      }}
+      style={{ background: S.cardBg, borderRadius: 16, padding: '12px 10px', marginBottom: 10, border: `1px solid ${S.border}`, borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}`, transition: 'box-shadow 0.3s ease, background 0.35s ease' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: '50%',
-          background: S.navyBg, color: S.navy,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 700, fontSize: 14, flexShrink: 0
-        }}>
-          {getInitials(s.name)}
+        <div style={{ width: 42, height: 42, borderRadius: '50%', background: S.navyBg, color: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+          {initials(s.name)}
         </div>
-
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: S.text }}>
-            {s.name}
+          <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: S.text }}>{s.name}</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 2, marginBottom: 2, background: S.navyBg, color: S.navy, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, border: `1px solid ${S.navyBorder}` }}>
+            {formatJoiningDate(s)}
           </div>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 3,
-            marginTop: 2, marginBottom: 2,
-            background: S.navyBg, color: S.navy,
-            fontSize: 10, fontWeight: 600,
-            padding: '2px 7px', borderRadius: 20,
-            border: `1px solid ${S.navyBorder}`,
-          }}>
-            📅 {formatJoiningDate(s)}
-          </div>
-          <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>
-            Bill: ₹{s.totalDue}
-          </div>
+          <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>Bill: Rs {s.totalDue}</div>
         </div>
       </div>
-
       <div className="btn-row">
         <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call">   <Phone         size={14} /></button>
         <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit">   <Pencil        size={14} /></button>
         <button onClick={() => downloadBill(s)}       style={ibtn('bill')} title="Bill PDF"><Download      size={14} /></button>
         <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')} title="WhatsApp"><MessageCircle size={14} /></button>
         <button onClick={() => handlePay(s._id)}      style={ibtn('paid')}>Paid</button>
-        <button
-          onClick={() => handleDelete(s._id)}
-          style={{
-            border: 'none', background: S.redBg, color: S.red,
-            borderRadius: 8, padding: 9, cursor: 'pointer',
-            minWidth: 36, minHeight: 36,
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
-          title="Delete"
-        >
+        <button onClick={() => handleDelete(s._id)} style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 8, padding: 9, minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Delete">
           <Trash2 size={14} />
         </button>
       </div>
