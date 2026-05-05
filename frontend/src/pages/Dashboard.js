@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Pencil, X, Check, FileText, Send, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { UserPlus, BellRing, Download, MessageCircle, Trash2, Loader2, Phone, Pencil, X, Check, FileText, Send, Sparkles, ArrowUpDown, ChevronDown, Search, Navigation } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchStudents, fetchExpenses, payFees, addStudent, fetchAlerts, deleteStudent, API } from '../api';
@@ -56,6 +56,15 @@ const Dashboard = () => {
   const [mealMsg, setMealMsg]                   = useState('');
   const [broadcastLoading, setBroadcastLoading] = useState(false);
 
+  // ── NEW: Sort State ──────────────────────────────────────
+  const [sortByJoining, setSortByJoining] = useState(false); // toggle joining date ascending sort
+
+  // ── NEW: Jump-to-Student State ───────────────────────────
+  const [showJumpMenu, setShowJumpMenu]   = useState(false);
+  const [jumpSearch, setJumpSearch]       = useState('');
+  const studentRefs = useRef({});          // { studentId: domRef }
+  const jumpInputRef = useRef(null);
+
   const today = new Date();
   const [viewMonth, setViewMonth]     = useState(today.getMonth());
   const [viewYear, setViewYear]       = useState(today.getFullYear());
@@ -82,6 +91,26 @@ const Dashboard = () => {
     };
     initLoad();
   }, []);
+
+  // Close jump menu when clicking outside
+  useEffect(() => {
+    if (!showJumpMenu) return;
+    const handler = (e) => {
+      if (!e.target.closest('.jump-menu-container')) {
+        setShowJumpMenu(false);
+        setJumpSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showJumpMenu]);
+
+  // Focus jump search input when menu opens
+  useEffect(() => {
+    if (showJumpMenu && jumpInputRef.current) {
+      setTimeout(() => jumpInputRef.current?.focus(), 100);
+    }
+  }, [showJumpMenu]);
 
   const getAlerts = async () => {
     try { const res = await fetchAlerts(); setAlerts(res.data || []); }
@@ -247,8 +276,8 @@ const Dashboard = () => {
       });
       if (res.data) {
         alert("✅ Student details updated successfully!");
-        setEditStudent(null); // close modal
-        loadData();           // refresh list
+        setEditStudent(null);
+        loadData();
       }
     } catch (err) {
       console.error("Update Error:", err.response?.data);
@@ -256,6 +285,22 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ── NEW: Jump to student ─────────────────────────────────
+  const handleJumpTo = (studentId) => {
+    const el = studentRefs.current[studentId];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Highlight flash effect
+      el.style.boxShadow = `0 0 0 3px ${S.orange}, 0 4px 20px rgba(230,81,0,0.3)`;
+      el.style.transition = 'box-shadow 0.3s ease';
+      setTimeout(() => {
+        el.style.boxShadow = '';
+      }, 2000);
+    }
+    setShowJumpMenu(false);
+    setJumpSearch('');
   };
 
   const filteredExpenses = expenses.filter(e => {
@@ -267,8 +312,20 @@ const Dashboard = () => {
   const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
   const netProfit    = totalRevenue - totalExp;
 
-  const filteredStudents = students.filter(s =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // ── NEW: Apply sort + search ─────────────────────────────
+  const filteredStudents = students
+    .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      if (!sortByJoining) return 0; // keep original order
+      const dateA = new Date(a.joiningDate || a.createdAt || 0);
+      const dateB = new Date(b.joiningDate || b.createdAt || 0);
+      return dateA - dateB; // ascending
+    });
+
+  // For jump menu: search from ALL students (not filtered by searchTerm)
+  const jumpStudents = students.filter(s =>
+    s.name.toLowerCase().includes(jumpSearch.toLowerCase()) ||
+    (s.phone || '').includes(jumpSearch)
   );
 
   const handleFullBackup = async () => {
@@ -294,6 +351,14 @@ const Dashboard = () => {
     return new Date(raw).toLocaleDateString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric'
     });
+  };
+
+  // ── Helper: get joining month-year label ─────────────────
+  const getJoiningMonthLabel = (student) => {
+    const raw = student.joiningDate || student.createdAt;
+    if (!raw) return '';
+    const d = new Date(raw);
+    return `${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
   const isMobile = window.innerWidth <= 480;
@@ -364,8 +429,20 @@ const Dashboard = () => {
     );
   }
 
+  // ── Group students by joining month when sortByJoining is on ──
+  let groupedDisplay = null;
+  if (sortByJoining) {
+    const groups = {};
+    filteredStudents.forEach(s => {
+      const key = getJoiningMonthLabel(s) || 'Unknown';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(s);
+    });
+    groupedDisplay = Object.entries(groups); // [ [monthLabel, [students]] ]
+  }
+
   return (
-    <div className="dashboard-root" style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 100 }}>
+    <div className="dashboard-root" style={{ background: S.pageBg, minHeight: '100vh', fontFamily: "'Segoe UI', Arial, sans-serif", paddingBottom: 120 }}>
 
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
@@ -448,6 +525,171 @@ const Dashboard = () => {
         .spinning-icon { animation: rotate 1s linear infinite; }
         @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+        /* ── NEW: Sort Banner ── */
+        .sort-banner {
+          margin: 0 12px 10px;
+          background: linear-gradient(135deg, #F3EEFF, #EEF2FA);
+          border: 1.5px solid #C4B5FD;
+          border-radius: 10px;
+          padding: 8px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          animation: slideDown 0.2s ease;
+        }
+        .sort-banner-text { font-size: 11px; font-weight: 700; color: #7C3AED; display: flex; align-items: center; gap: 5px; }
+        .sort-clear-btn { border: none; background: #EDE9FE; color: #7C3AED; border-radius: 6px; padding: 4px 8px; font-size: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 3px; }
+
+        /* ── NEW: Month Group Header ── */
+        .month-group-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 12px 0 6px;
+        }
+        .month-group-label {
+          font-size: 11px;
+          font-weight: 800;
+          color: #7C3AED;
+          background: #F3EEFF;
+          border: 1px solid #C4B5FD;
+          border-radius: 20px;
+          padding: 3px 10px;
+          white-space: nowrap;
+          letter-spacing: 0.3px;
+        }
+        .month-group-line {
+          flex: 1;
+          height: 1px;
+          background: #C4B5FD;
+          opacity: 0.4;
+        }
+
+        /* ── NEW: Floating Jump Button ── */
+        .jump-fab {
+          position: fixed;
+          bottom: calc(24px + env(safe-area-inset-bottom));
+          right: 16px;
+          z-index: 50;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 8px;
+        }
+
+        .jump-btn {
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #1B3A6B, #2563EB);
+          border: none;
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 4px 16px rgba(27,58,107,0.4);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .jump-btn:active { transform: scale(0.93); }
+
+        .jump-count-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: #E65100;
+          color: white;
+          font-size: 9px;
+          font-weight: 800;
+          border-radius: 10px;
+          padding: 2px 5px;
+          min-width: 18px;
+          text-align: center;
+          border: 2px solid white;
+        }
+
+        /* ── NEW: Jump Menu ── */
+        .jump-menu-container {
+          position: fixed;
+          bottom: calc(84px + env(safe-area-inset-bottom));
+          right: 12px;
+          z-index: 51;
+          width: min(300px, calc(100vw - 24px));
+          background: white;
+          border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(27,58,107,0.2), 0 2px 8px rgba(0,0,0,0.08);
+          border: 1.5px solid #C6D4ED;
+          overflow: hidden;
+          animation: jumpMenuIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes jumpMenuIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.95); }
+          to   { opacity: 1; transform: translateY(0)   scale(1); }
+        }
+
+        .jump-menu-header {
+          padding: 10px 12px 8px;
+          border-bottom: 1px solid #E8ECF4;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .jump-menu-title { font-size: 12px; font-weight: 800; color: #1B3A6B; display: flex; align-items: center; gap: 5px; }
+
+        .jump-search-wrap {
+          padding: 8px 10px;
+          border-bottom: 1px solid #E8ECF4;
+        }
+        .jump-search-inp {
+          width: 100%;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1.5px solid #E8ECF4;
+          font-size: 13px;
+          background: #F8FAFF;
+          outline: none;
+          color: #1A1A2E;
+          box-sizing: border-box;
+        }
+        .jump-search-inp:focus { border-color: #1B3A6B; }
+
+        .jump-list {
+          max-height: 280px;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .jump-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 12px;
+          cursor: pointer;
+          border-bottom: 1px solid #F0F4FF;
+          transition: background 0.12s;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .jump-item:active { background: #EEF2FA; }
+        .jump-item-avatar {
+          width: 32px; height: 32px;
+          border-radius: 50%;
+          background: #EEF2FA;
+          color: #1B3A6B;
+          font-size: 11px;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .jump-item-info { flex: 1; min-width: 0; }
+        .jump-item-name { font-size: 13px; font-weight: 700; color: #1A1A2E; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .jump-item-sub { font-size: 10px; color: #8A95B0; }
+        .jump-item-due { font-size: 11px; font-weight: 700; flex-shrink: 0; }
+
+        .jump-empty { padding: 20px; text-align: center; font-size: 13px; color: #8A95B0; }
+
         @media (max-width: 380px) {
           .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .topbar-action span { display: none; }
@@ -479,24 +721,9 @@ const Dashboard = () => {
               </button>
             </div>
 
-            <input
-              value={editName}
-              onChange={e => setEditName(e.target.value)}
-              placeholder="Student name"
-              style={inp}
-            />
-            <input
-              value={editPhone}
-              onChange={e => setEditPhone(e.target.value)}
-              placeholder="Phone number"
-              style={inp}
-            />
-            <input
-              value={editEmail}
-              onChange={e => setEditEmail(e.target.value)}
-              placeholder="Email ID"
-              style={inp}
-            />
+            <input value={editName}  onChange={e => setEditName(e.target.value)}  placeholder="Student name"   style={inp} />
+            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone number"   style={inp} />
+            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="Email ID"       style={inp} />
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 12, color: S.muted, fontWeight: 600, display: 'block', marginBottom: 4 }}>
                 📅 Joining Date
@@ -558,7 +785,6 @@ const Dashboard = () => {
       {/* ── BROADCAST PANEL ── */}
       {showBroadcast && (
         <div className="broadcast-panel">
-          {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: S.orange, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Send size={15} color={S.orange} /> Broadcast Notification
@@ -571,7 +797,6 @@ const Dashboard = () => {
             </button>
           </div>
 
-          {/* Quick Templates */}
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 11, color: S.muted, fontWeight: 600, marginBottom: 6 }}>⚡ Quick Templates:</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -583,34 +808,23 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Message Textarea */}
           <textarea
             value={mealMsg}
             onChange={e => setMealMsg(e.target.value)}
             placeholder="Yahan apna message likhein... (ya upar se template choose karein)"
             rows={5}
             style={{
-              width: '100%',
-              padding: '12px 14px',
-              borderRadius: 10,
+              width: '100%', padding: '12px 14px', borderRadius: 10,
               border: `1.5px solid ${mealMsg ? S.orange : S.border}`,
-              fontSize: 14,
-              color: S.text,
-              background: '#FFFAF5',
-              outline: 'none',
-              resize: 'vertical',
-              fontFamily: 'inherit',
-              boxSizing: 'border-box',
+              fontSize: 14, color: S.text, background: '#FFFAF5', outline: 'none',
+              resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box',
               transition: 'border-color 0.2s',
             }}
           />
-
-          {/* Char count */}
           <div style={{ fontSize: 10, color: S.muted, textAlign: 'right', marginTop: 3 }}>
             {mealMsg.length} characters
           </div>
 
-          {/* Send Button */}
           <button
             className="broadcast-send-btn"
             onClick={handleBroadcast}
@@ -731,15 +945,54 @@ const Dashboard = () => {
         </form>
       </div>
 
-      {/* ── SEARCH ── */}
-      <div style={{ padding: '0 12px 15px' }}>
+      {/* ── SEARCH + SORT ROW ── */}
+      <div style={{ padding: '0 12px 10px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           type="text"
           placeholder="🔍 Search students..."
-          style={{ ...inp, borderRadius: 25, marginBottom: 0 }}
+          style={{ ...inp, borderRadius: 25, marginBottom: 0, flex: 1 }}
           onChange={e => setSearchTerm(e.target.value)}
         />
+
+        {/* ── NEW: Sort by Joining Date button ── */}
+        <button
+          onClick={() => setSortByJoining(prev => !prev)}
+          title="Sort by Joining Date"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '10px 12px',
+            border: `1.5px solid ${sortByJoining ? S.purple : S.border}`,
+            borderRadius: 25,
+            background: sortByJoining ? S.purpleBg : S.white,
+            color: sortByJoining ? S.purple : S.muted,
+            fontWeight: 700,
+            fontSize: 11,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            minHeight: 44,
+            flexShrink: 0,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <ArrowUpDown size={14} />
+          {sortByJoining ? 'Sorted' : 'Sort'}
+        </button>
       </div>
+
+      {/* ── NEW: Sort Active Banner ── */}
+      {sortByJoining && (
+        <div className="sort-banner">
+          <div className="sort-banner-text">
+            <ArrowUpDown size={13} />
+            Joining date ke hisaab se sort kiya (purana → naya)
+          </div>
+          <button className="sort-clear-btn" onClick={() => setSortByJoining(false)}>
+            <X size={10} /> Hatao
+          </button>
+        </div>
+      )}
 
       {/* ── STUDENT LIST ── */}
       <div style={{ padding: '0 12px' }}>
@@ -749,83 +1002,194 @@ const Dashboard = () => {
           </div>
         )}
 
-        {filteredStudents.map(s => (
-          <div key={s._id} style={{
-            background: S.white,
-            borderRadius: 16,
-            padding: '12px 10px',
-            marginBottom: 10,
-            border: `1px solid ${S.border}`,
-            borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}`,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-
-              {/* Avatar */}
-              <div style={{
-                width: 42, height: 42, borderRadius: '50%',
-                background: S.navyBg, color: S.navy,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: 14, flexShrink: 0
-              }}>
-                {getInitials(s.name)}
-              </div>
-
-              {/* ── Name + Joining Date + Bill ── */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {/* Student Name */}
-                <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: S.text }}>
-                  {s.name}
-                </div>
-
-                {/* ✅ NEW: Joining Date badge right under name */}
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 3,
-                  marginTop: 2,
-                  marginBottom: 2,
-                  background: S.navyBg,
-                  color: S.navy,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  padding: '2px 7px',
-                  borderRadius: 20,
-                  border: `1px solid ${S.navyBorder}`,
-                }}>
-                  📅 {formatJoiningDate(s)}
-                </div>
-
-                {/* Bill amount */}
-                <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>
-                  Bill: ₹{s.totalDue}
-                </div>
-              </div>
+        {/* ── Grouped view when sort is ON ── */}
+        {sortByJoining && groupedDisplay && groupedDisplay.map(([monthLabel, groupStudents]) => (
+          <div key={monthLabel}>
+            {/* Month Group Header */}
+            <div className="month-group-header">
+              <div className="month-group-line" />
+              <div className="month-group-label">📅 {monthLabel}</div>
+              <div className="month-group-line" />
             </div>
 
-            {/* Action Buttons */}
-            <div className="btn-row">
-              <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call">   <Phone         size={14} /></button>
-              <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit">   <Pencil        size={14} /></button>
-              <button onClick={() => downloadBill(s)}       style={ibtn('bill')} title="Bill PDF"><Download      size={14} /></button>
-              <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')} title="WhatsApp"><MessageCircle size={14} /></button>
-              <button onClick={() => handlePay(s._id)}      style={ibtn('paid')}>Paid</button>
-              <button
-                onClick={() => handleDelete(s._id)}
-                style={{
-                  border: 'none', background: S.redBg, color: S.red,
-                  borderRadius: 8, padding: 9, cursor: 'pointer',
-                  minWidth: 36, minHeight: 36,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}
-                title="Delete"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
+            {groupStudents.map(s => (
+              <StudentCard
+                key={s._id}
+                s={s}
+                studentRefs={studentRefs}
+                formatJoiningDate={formatJoiningDate}
+                S={S}
+                isMobile={isMobile}
+                ibtn={ibtn}
+                handleCall={handleCall}
+                openEdit={openEdit}
+                downloadBill={downloadBill}
+                sendWelcomeMessage={sendWelcomeMessage}
+                handlePay={handlePay}
+                handleDelete={handleDelete}
+              />
+            ))}
           </div>
+        ))}
+
+        {/* ── Normal view when sort is OFF ── */}
+        {!sortByJoining && filteredStudents.map(s => (
+          <StudentCard
+            key={s._id}
+            s={s}
+            studentRefs={studentRefs}
+            formatJoiningDate={formatJoiningDate}
+            S={S}
+            isMobile={isMobile}
+            ibtn={ibtn}
+            handleCall={handleCall}
+            openEdit={openEdit}
+            downloadBill={downloadBill}
+            sendWelcomeMessage={sendWelcomeMessage}
+            handlePay={handlePay}
+            handleDelete={handleDelete}
+          />
         ))}
       </div>
 
+      {/* ── NEW: Jump-to-Student Menu ── */}
+      {showJumpMenu && (
+        <div className="jump-menu-container">
+          <div className="jump-menu-header">
+            <div className="jump-menu-title">
+              <Navigation size={13} color={S.navy} />
+              Student dhundho
+            </div>
+            <button
+              onClick={() => { setShowJumpMenu(false); setJumpSearch(''); }}
+              style={{ border: 'none', background: S.redBg, color: S.red, borderRadius: 6, padding: '4px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+
+          <div className="jump-search-wrap">
+            <input
+              ref={jumpInputRef}
+              className="jump-search-inp"
+              placeholder="Naam ya phone se search..."
+              value={jumpSearch}
+              onChange={e => setJumpSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="jump-list">
+            {jumpStudents.length === 0 && (
+              <div className="jump-empty">Koi student nahi mila 🔍</div>
+            )}
+            {jumpStudents.map(s => (
+              <div key={s._id} className="jump-item" onClick={() => handleJumpTo(s._id)}>
+                <div className="jump-item-avatar">{getInitials(s.name)}</div>
+                <div className="jump-item-info">
+                  <div className="jump-item-name">{s.name}</div>
+                  <div className="jump-item-sub">{formatJoiningDate(s)}</div>
+                </div>
+                <div
+                  className="jump-item-due"
+                  style={{ color: s.totalDue > 0 ? S.red : S.green }}
+                >
+                  ₹{s.totalDue}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── NEW: Floating Jump Button ── */}
+      <div className="jump-fab">
+        <div style={{ position: 'relative' }}>
+          <button
+            className="jump-btn"
+            onClick={() => setShowJumpMenu(prev => !prev)}
+            title="Kisi bhi student par seedha jaao"
+          >
+            <Navigation size={22} />
+          </button>
+          <div className="jump-count-badge">{students.length}</div>
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+// ── Extracted StudentCard component to avoid repetition ──
+const StudentCard = ({
+  s, studentRefs, formatJoiningDate, S, isMobile, ibtn,
+  handleCall, openEdit, downloadBill, sendWelcomeMessage, handlePay, handleDelete
+}) => {
+  const getInitials = (name = '') =>
+    name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
+  return (
+    <div
+      key={s._id}
+      ref={el => { studentRefs.current[s._id] = el; }}
+      style={{
+        background: S.white,
+        borderRadius: 16,
+        padding: '12px 10px',
+        marginBottom: 10,
+        border: `1px solid ${S.border}`,
+        borderLeft: `5px solid ${s.totalDue > 1500 ? S.red : S.green}`,
+        transition: 'box-shadow 0.3s ease',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: '50%',
+          background: S.navyBg, color: S.navy,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 700, fontSize: 14, flexShrink: 0
+        }}>
+          {getInitials(s.name)}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: S.text }}>
+            {s.name}
+          </div>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            marginTop: 2, marginBottom: 2,
+            background: S.navyBg, color: S.navy,
+            fontSize: 10, fontWeight: 600,
+            padding: '2px 7px', borderRadius: 20,
+            border: `1px solid ${S.navyBorder}`,
+          }}>
+            📅 {formatJoiningDate(s)}
+          </div>
+          <div style={{ fontSize: 12, color: s.totalDue > 0 ? S.red : S.green, fontWeight: 'bold' }}>
+            Bill: ₹{s.totalDue}
+          </div>
+        </div>
+      </div>
+
+      <div className="btn-row">
+        <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call">   <Phone         size={14} /></button>
+        <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit">   <Pencil        size={14} /></button>
+        <button onClick={() => downloadBill(s)}       style={ibtn('bill')} title="Bill PDF"><Download      size={14} /></button>
+        <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')} title="WhatsApp"><MessageCircle size={14} /></button>
+        <button onClick={() => handlePay(s._id)}      style={ibtn('paid')}>Paid</button>
+        <button
+          onClick={() => handleDelete(s._id)}
+          style={{
+            border: 'none', background: S.redBg, color: S.red,
+            borderRadius: 8, padding: 9, cursor: 'pointer',
+            minWidth: 36, minHeight: 36,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+          title="Delete"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
     </div>
   );
 };
