@@ -62,19 +62,21 @@ const Dashboard = () => {
   const handleEditSave = async () => {
     try {
       setLoading(true);
-      // Backend route: /api/students/update-profile/:id
-      await API.put(`/students/update-profile/${editingStudent._id}`, editingStudent);
+      // Hamare naye backend route ko call karein
+      const res = await API.put(`/students/update-profile/${editingStudent._id}`, editingStudent);
       
-      alert("✅ Student details updated!");
-      setEditModalOpen(false);
-      loadData(); // Refresh list
+      if(res.data) {
+        alert("✅ Student details updated successfully!");
+        setEditModalOpen(false);
+        loadData(); // List ko refresh karein
+      }
     } catch (err) {
-      console.error(err);
-      alert("❌ Update failed! Check console.");
+      console.error("Update Error:", err.response?.data);
+      alert("❌ Update fail ho gaya! Console check karein.");
     } finally {
       setLoading(false);
     }
-  };
+};
 
   // ── ACTIONS ──
   const handleAdd = async (e) => {

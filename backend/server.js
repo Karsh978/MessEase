@@ -273,18 +273,32 @@ app.post('/api/menu/update', async (req, res) => {
 
 
 // 12. UPDATE STUDENT PROFILE
+// server.js mein isey replace karein:
 app.put('/api/students/update-profile/:id', async (req, res) => {
-  try {
-    const { address, emergencyContact, profilePic, email } = req.body;
-    const updatedStudent = await Student.findByIdAndUpdate(
-      req.params.id,
-      { address, emergencyContact, profilePic, email },
-      { new: true }
-    );
-    res.json(updatedStudent);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    try {
+        // Saari fields jo hum bhej rahe hain unhe yahan pakdna hoga
+        const { 
+            name, phone, email, password, joiningDate, 
+            address, emergencyContact, profilePic 
+        } = req.body;
+
+        const Student = require('./models/Student');
+        
+        const updatedStudent = await Student.findByIdAndUpdate(
+            req.params.id, 
+            { 
+                name, phone, email, password, joiningDate, 
+                address, emergencyContact, profilePic 
+            }, 
+            { new: true } // new:true se updated data wapas milta hai
+        );
+        
+        if (!updatedStudent) return res.status(404).json({ msg: "Student nahi mila" });
+        
+        res.json(updatedStudent);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // 13. DELETE STUDENT
