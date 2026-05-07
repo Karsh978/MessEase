@@ -223,7 +223,7 @@ app.get('/api/students/bill-summary/:id', async (req, res) => {
 app.post('/api/attendance/mark-all', async (req, res) => {
   try {
     const { date, mealType } = req.body;
-    const rates    = { breakfast: 25, lunch: 50, dinner: 50 };
+    const rates    = { breakfast: 1, lunch: 50, dinner: 50 };
     const students = await Student.find();
 
     if (!students || students.length === 0) return res.status(404).json({ msg: "No students found" });
