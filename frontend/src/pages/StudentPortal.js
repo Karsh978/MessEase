@@ -11,7 +11,8 @@ const GoogleLoader = () => (
     <style>{`
       @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
       @keyframes colorShift {
-        0%{stroke:#4285F4} 25%{stroke:#EA4335} 50%{stroke:#FBBC05} 75%{stroke:#34A853} 100%{stroke:#4285F4}
+        0%{stroke:#4285F4} 25%{stroke:#EA4335}
+        50%{stroke:#FBBC05} 75%{stroke:#34A853} 100%{stroke:#4285F4}
       }
       .google-ring {
         transform-origin:50px 50px;
@@ -105,32 +106,17 @@ const StudentPortal = () => {
     } catch (e) { alert("Update failed!"); }
   };
 
-  const upiId  = '9669168716@ybl';
-  const amount = data?.student?.totalDue || 0;
-  const upiParams = `pa=${upiId}&pn=Didi%20Mess&am=${amount}&cu=INR`;
-
-  // ── These links open the installed app directly on Android & iOS ──
-  // gpay uses a special https link that Android intercepts
-  const payLinks = {
-    gpay:    `https://gpay.app.goo.gl/pay?${upiParams}`,
-    phonepe: `https://phon.pe/ru_MESS?${upiParams}`,     // PhonePe web redirect
-    paytm:   `https://paytm.me/DIDIMESS?${upiParams}`,   // Paytm web redirect
-
-    // True native intents — most reliable on Android Chrome
-    gpayIntent:    `intent://pay?${upiParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`,
-    phonepeIntent: `intent://pay?${upiParams}#Intent;scheme=upi;package=com.phonepe.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.phonepe.app;end`,
-    paytmIntent:   `intent://pay?${upiParams}#Intent;scheme=paytm;package=net.one97.paytm;end`,
-  };
-
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?${upiParams}`)}`;
-  const phonePeUrl = 'https://phon.pe/pay?pa=' + upiId + '&pn=Didi%20Mess&am=' + amount + '&cu=INR';
-
   const handleCopy = () => {
     navigator.clipboard.writeText(upiId).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
   };
+
+  const upiId  = '9669168716@ybl';
+  const amount = data?.student?.totalDue || 0;
+  const upiString = 'upi://pay?pa=' + upiId + '&pn=Didi%20Mess&am=' + amount + '&cu=INR';
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(upiString);
 
   if (isLoading) return <GoogleLoader />;
 
@@ -163,35 +149,26 @@ const StudentPortal = () => {
             <h3 style={s.modalTitle}>Pay ₹{amount}</h3>
             <p style={s.modalSub}>Didi Mess · UPI Payment</p>
 
-            {/* ── App buttons — intent:// links, most reliable ── */}
-            <p style={s.secLabel}>App se pay karo (recommended):</p>
-            <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'8px' }}>
-
-              {/* Google Pay */}
-              <a href={payLinks.gpayIntent} style={s.appBtn('#fff','#1a73e8','1.5px solid #dadde1')}>
-                <span style={s.appIcon}>G</span>
-                <span style={{ flex:1, fontWeight:'800', fontSize:'15px' }}>Google Pay</span>
-                <span style={s.arrow}>→</span>
-              </a>
-
-              {/* PhonePe */}
-              <a href={phonePeUrl} style={s.appBtn('#5f259f','#fff','none')}>
-                <span style={{...s.appIcon, background:'rgba(255,255,255,0.2)', color:'#fff'}}>P</span>
-                <span style={{ flex:1, fontWeight:'800', fontSize:'15px' }}>PhonePe</span>
-                <span style={s.arrow}>→</span>
-              </a>
-
-              {/* Paytm */}
-              <a href={payLinks.paytmIntent} style={s.appBtn('#00baf2','#fff','none')}>
-                <span style={{...s.appIcon, background:'rgba(255,255,255,0.2)', color:'#fff'}}>P</span>
-                <span style={{ flex:1, fontWeight:'800', fontSize:'15px' }}>Paytm</span>
-                <span style={s.arrow}>→</span>
-              </a>
+            {/* QR Code */}
+            <div style={s.qrWrapper}>
+              <div style={s.qrInner}>
+                <img src={qrUrl} alt="UPI QR Code" style={s.qrImg}/>
+              </div>
+              <p style={s.qrHint}>📱 Kisi bhi UPI app se scan karo</p>
+              <div style={s.appLogos}>
+                <span style={s.appPill}>GPay</span>
+                <span style={s.appPill}>PhonePe</span>
+                <span style={s.appPill}>Paytm</span>
+                <span style={s.appPill}>BHIM</span>
+              </div>
             </div>
 
-            {/* divider */}
+            {/* Amount chip */}
+            <div style={s.amountChip}>₹{amount} &nbsp;·&nbsp; Didi Mess</div>
+
+            {/* Divider */}
             <div style={s.divRow}>
-              <div style={s.divLine}/><span style={s.divTxt}>ya manually</span><div style={s.divLine}/>
+              <div style={s.divLine}/><span style={s.divTxt}>ya UPI ID se bhejo</span><div style={s.divLine}/>
             </div>
 
             {/* UPI ID copy */}
@@ -203,29 +180,21 @@ const StudentPortal = () => {
                 background: copied ? '#dcfce7' : '#ede9fe',
                 color:      copied ? '#16a34a' : '#4f46e5',
               }}>
-                {copied ? <><Check size={12}/>&nbsp;Copied!</> : <><Copy size={12}/>&nbsp;Copy</>}
+                {copied
+                  ? <span style={{ display:'flex', alignItems:'center', gap:'4px' }}><Check size={12}/> Copied!</span>
+                  : <span style={{ display:'flex', alignItems:'center', gap:'4px' }}><Copy size={12}/> Copy</span>
+                }
               </button>
             </div>
 
-            {/* step guide */}
+            {/* Step guide */}
             <div style={s.tipBox}>
-              <p style={{ margin:'0 0 4px 0', fontWeight:'700', fontSize:'12px', color:'#92400e' }}>📋 Manual steps:</p>
-              <p style={{ margin:0, fontSize:'11px', color:'#92400e', lineHeight:'1.7' }}>
-                1. UPI ID copy karo ↑<br/>
-                2. GPay / PhonePe / Paytm open karo<br/>
-                3. "Pay to UPI ID" → paste karo → ₹{amount} enter karo
+              <p style={{ margin:'0 0 6px 0', fontWeight:'700', fontSize:'12px', color:'#92400e' }}>📋 Steps:</p>
+              <p style={{ margin:0, fontSize:'11px', color:'#78350f', lineHeight:'1.8' }}>
+                <b>QR se:</b> GPay/PhonePe/Paytm kholo → Scan karo → Pay karo<br/>
+                <b>UPI ID se:</b> Copy karo → App mein "Pay to contact/UPI" → Paste → ₹{amount}
               </p>
             </div>
-
-            {/* Desktop QR */}
-            <details style={{ marginTop:'12px', textAlign:'left' }}>
-              <summary style={{ fontSize:'12px', color:'#64748b', cursor:'pointer', userSelect:'none' }}>
-                💻 Laptop pe scan karo (QR Code)
-              </summary>
-              <div style={s.qrBox}>
-                <img src={qrUrl} alt="UPI QR" style={{ width:180, height:180, borderRadius:10 }}/>
-              </div>
-            </details>
 
             <button type="button" onClick={() => setShowPayModal(false)} style={s.doneBtn}>
               Done ✓
@@ -237,7 +206,9 @@ const StudentPortal = () => {
 
       <div style={s.headerRow}>
         <div style={s.statusTag}><CheckCircle2 size={14}/> Verified</div>
-        <div style={{...s.statusTag, background:'#fffbeb', color:'#b45309'}}><AlertCircle size={14}/> Due: 01 June</div>
+        <div style={{...s.statusTag, background:'#fffbeb', color:'#b45309'}}>
+          <AlertCircle size={14}/> Due: 01 June
+        </div>
       </div>
 
       <div style={s.cardMain}>
@@ -337,7 +308,7 @@ const StudentPortal = () => {
         <p style={{ fontWeight:'800', fontSize:'14px', color:'#1e293b' }}>Didi Mess Solutions</p>
         <p style={{ fontSize:'11px', color:'#64748b' }}>Developed by Jivan Karsh</p>
         <div style={s.footerBottom}>
-          <span>v2.7.0</span>
+          <span>v2.8.0</span>
           <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
             <div style={s.statusDot}></div><span>Secure</span>
           </div>
@@ -389,28 +360,26 @@ const s = {
   statusDot:     { width:'6px', height:'6px', background:'#22c55e', borderRadius:'50%' },
 
   /* modal */
-  overlay:   { position:'fixed', inset:0, background:'rgba(15,23,42,0.6)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:9999 },
-  modal:     { background:'#fff', width:'100%', maxWidth:'480px', borderRadius:'28px 28px 0 0', padding:'28px 20px 40px', position:'relative', textAlign:'center', maxHeight:'92vh', overflowY:'auto' },
-  closeBtn:  { position:'absolute', top:'16px', right:'16px', background:'#f1f5f9', border:'none', borderRadius:'50%', width:'34px', height:'34px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#475569' },
-  modalTitle:{ margin:'0 0 4px 0', fontSize:'20px', color:'#1e293b', fontWeight:'800' },
-  modalSub:  { margin:'0 0 16px 0', fontSize:'12px', color:'#64748b' },
-  secLabel:  { fontSize:'12px', color:'#475569', textAlign:'left', marginBottom:'10px', fontWeight:'700' },
-  appBtn:    (bg, color, border) => ({
-    display:'flex', alignItems:'center', gap:'12px', padding:'14px 16px',
-    borderRadius:'14px', background:bg, border, color,
-    textDecoration:'none', cursor:'pointer', width:'100%', boxSizing:'border-box'
-  }),
-  appIcon:   { width:'32px', height:'32px', borderRadius:'8px', background:'#e8f0fe', color:'#1a73e8', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'900', fontSize:'16px', flexShrink:0 },
-  arrow:     { fontSize:'18px', opacity:0.5 },
-  divRow:    { display:'flex', alignItems:'center', gap:'10px', margin:'16px 0' },
-  divLine:   { flex:1, height:'1px', background:'#e2e8f0' },
-  divTxt:    { fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap' },
-  upiRow:    { display:'flex', alignItems:'center', gap:'10px', background:'#f8fafc', padding:'12px 14px', borderRadius:'14px', marginBottom:'10px', textAlign:'left' },
-  upiText:   { fontSize:'13px', fontWeight:'700', color:'#1e293b', flex:1 },
-  copyBtn:   { padding:'7px 12px', borderRadius:'10px', border:'none', fontSize:'12px', fontWeight:'700', cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center' },
-  tipBox:    { background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'12px', padding:'12px 14px', textAlign:'left', marginBottom:'4px' },
-  qrBox:     { display:'flex', justifyContent:'center', background:'#f8fafc', borderRadius:'16px', padding:'16px', marginTop:'12px' },
-  doneBtn:   { width:'100%', padding:'14px', background:'#1e293b', color:'#fff', border:'none', borderRadius:'14px', fontWeight:'800', cursor:'pointer', fontSize:'15px', marginTop:'16px' },
+  overlay:    { position:'fixed', inset:0, background:'rgba(15,23,42,0.6)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:9999 },
+  modal:      { background:'#fff', width:'100%', maxWidth:'480px', borderRadius:'28px 28px 0 0', padding:'28px 20px 40px', position:'relative', textAlign:'center', maxHeight:'92vh', overflowY:'auto' },
+  closeBtn:   { position:'absolute', top:'16px', right:'16px', background:'#f1f5f9', border:'none', borderRadius:'50%', width:'34px', height:'34px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#475569' },
+  modalTitle: { margin:'0 0 4px 0', fontSize:'20px', color:'#1e293b', fontWeight:'800' },
+  modalSub:   { margin:'0 0 16px 0', fontSize:'12px', color:'#64748b' },
+  qrWrapper:  { background:'linear-gradient(135deg,#f0f9ff,#eff6ff)', borderRadius:'20px', padding:'20px 16px 14px', marginBottom:'16px' },
+  qrInner:    { display:'flex', justifyContent:'center', background:'#fff', borderRadius:'14px', padding:'14px', marginBottom:'10px', boxShadow:'0 2px 12px rgba(0,0,0,0.08)' },
+  qrImg:      { width:'220px', height:'220px', borderRadius:'8px', display:'block' },
+  qrHint:     { fontSize:'12px', color:'#475569', margin:'0 0 8px 0', fontWeight:'600' },
+  appLogos:   { display:'flex', justifyContent:'center', gap:'8px', flexWrap:'wrap' },
+  appPill:    { fontSize:'11px', fontWeight:'700', background:'#fff', color:'#4f46e5', padding:'4px 12px', borderRadius:'20px', border:'1px solid #c7d2fe' },
+  amountChip: { display:'inline-block', background:'#ede9fe', color:'#4f46e5', padding:'7px 20px', borderRadius:'20px', fontSize:'14px', fontWeight:'800', marginBottom:'14px' },
+  divRow:     { display:'flex', alignItems:'center', gap:'10px', margin:'4px 0 14px 0' },
+  divLine:    { flex:1, height:'1px', background:'#e2e8f0' },
+  divTxt:     { fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap' },
+  upiRow:     { display:'flex', alignItems:'center', gap:'10px', background:'#f8fafc', padding:'12px 14px', borderRadius:'14px', marginBottom:'10px', textAlign:'left' },
+  upiText:    { fontSize:'13px', fontWeight:'700', color:'#1e293b', flex:1 },
+  copyBtn:    { padding:'7px 12px', borderRadius:'10px', border:'none', fontSize:'12px', fontWeight:'700', cursor:'pointer', flexShrink:0 },
+  tipBox:     { background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'12px', padding:'12px 14px', textAlign:'left', marginBottom:'4px' },
+  doneBtn:    { width:'100%', padding:'14px', background:'#1e293b', color:'#fff', border:'none', borderRadius:'14px', fontWeight:'800', cursor:'pointer', fontSize:'15px', marginTop:'16px' },
 };
 
 export default StudentPortal;
