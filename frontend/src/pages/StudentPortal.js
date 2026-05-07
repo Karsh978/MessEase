@@ -123,6 +123,7 @@ const StudentPortal = () => {
   };
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?${upiParams}`)}`;
+  const phonePeUrl = 'https://phon.pe/pay?pa=' + upiId + '&pn=Didi%20Mess&am=' + amount + '&cu=INR';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(upiId).then(() => {
@@ -174,7 +175,7 @@ const StudentPortal = () => {
               </a>
 
               {/* PhonePe */}
-              <a href={`https://phon.pe/pay?pa=${upiId}&pn=Didi%20Mess&am=${amount}&cu=INR`} style={s.appBtn('#5f259f','#fff','none')}>
+              <a href={phonePeUrl} style={s.appBtn('#5f259f','#fff','none')}>
                 <span style={{...s.appIcon, background:'rgba(255,255,255,0.2)', color:'#fff'}}>P</span>
                 <span style={{ flex:1, fontWeight:'800', fontSize:'15px' }}>PhonePe</span>
                 <span style={s.arrow}>→</span>
