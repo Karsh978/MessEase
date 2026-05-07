@@ -140,7 +140,7 @@ const Attendance = () => {
 
   /* global styles injected once */
   const globalStyles = `
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes spin { to { transform: rotate(360deg); } } html, body, #root { overflow-x: hidden !important; max-width: 100vw !important; } * { box-sizing: border-box; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     input[type=date]::-webkit-calendar-picker-indicator { 
       filter: ${darkMode ? 'invert(1)' : 'none'};
@@ -156,11 +156,11 @@ const Attendance = () => {
   );
 
   return (
-    <div style={{ minHeight:'100vh', background:t.bg, fontFamily:'system-ui, -apple-system, sans-serif', transition:'background 0.3s' }}>
+    <div style={{ minHeight:'100vh', background:t.bg, fontFamily:'system-ui, -apple-system, sans-serif', transition:'background 0.3s', overflowX:'hidden', width:'100%', position:'relative' }}>
       <style>{globalStyles}</style>
 
       {/* ── max-width wrapper, full width on mobile ── */}
-      <div style={{ maxWidth:'600px', margin:'0 auto', padding:'14px 12px 120px' }}>
+      <div style={{ maxWidth:'600px', margin:'0 auto', padding:'14px 12px 120px', width:'100%', overflowX:'hidden' }}>
 
         {/* Header */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px' }}>
