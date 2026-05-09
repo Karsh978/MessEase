@@ -353,11 +353,13 @@ const Dashboard = () => {
     return new Date(raw).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  const getJoiningMonthLabel = (student) => {
+  // ── CHANGED: Day-based label instead of month-based ──
+  const getJoiningDayLabel = (student) => {
     const raw = student.joiningDate || student.createdAt;
     if (!raw) return '';
-    const d = new Date(raw);
-    return `${months[d.getMonth()]} ${d.getFullYear()}`;
+    const day = new Date(raw).getDate();
+    const suffix = day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th';
+    return `${day}${suffix} Tarikh`;
   };
 
   const filteredExpenses = expenses.filter(e => {
@@ -369,11 +371,14 @@ const Dashboard = () => {
   const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
   const netProfit    = totalRevenue - totalExp;
 
+  // ── CHANGED: Sort by day-of-month (getDate) instead of full date ──
   const filteredStudents = students
     .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
       if (!sortByJoining) return 0;
-      return new Date(a.joiningDate || a.createdAt || 0) - new Date(b.joiningDate || b.createdAt || 0);
+      const dayA = new Date(a.joiningDate || a.createdAt || 0).getDate();
+      const dayB = new Date(b.joiningDate || b.createdAt || 0).getDate();
+      return dayA - dayB;
     });
 
   const jumpStudents = students.filter(s =>
@@ -385,6 +390,18 @@ const Dashboard = () => {
   const paidCount   = students.filter(s => !s.totalDue || s.totalDue === 0).length;
   const unpaidCount = students.length - paidCount;
   const paidPercent = students.length ? Math.round((paidCount / students.length) * 100) : 0;
+
+  // ── CHANGED: Group by day label ──
+  let groupedDisplay = null;
+  if (sortByJoining) {
+    const groups = {};
+    filteredStudents.forEach(s => {
+      const key = getJoiningDayLabel(s) || 'Unknown';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(s);
+    });
+    groupedDisplay = Object.entries(groups);
+  }
 
   const isMobile = window.innerWidth <= 480;
 
@@ -424,17 +441,6 @@ const Dashboard = () => {
     flex: 1, background: S.cardBg, fontSize: '13px', fontWeight: '600',
     color: S.navy, WebkitAppearance: 'none', appearance: 'none',
   };
-
-  let groupedDisplay = null;
-  if (sortByJoining) {
-    const groups = {};
-    filteredStudents.forEach(s => {
-      const key = getJoiningMonthLabel(s) || 'Unknown';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(s);
-    });
-    groupedDisplay = Object.entries(groups);
-  }
 
   if (loading) {
     return (
@@ -572,14 +578,12 @@ const Dashboard = () => {
               flexShrink: 0,
             }}
           >
-            {/* Track label icons */}
             <span style={{ position: 'absolute', left: 7, fontSize: 11, opacity: darkMode ? 0 : 1, transition: 'opacity 0.3s' }}>
               <Sun size={12} color="#1B3A6B" />
             </span>
             <span style={{ position: 'absolute', right: 7, fontSize: 11, opacity: darkMode ? 1 : 0, transition: 'opacity 0.3s' }}>
               <Moon size={12} color="#93B4FF" />
             </span>
-            {/* Knob */}
             <div style={{
               width: 24, height: 24, borderRadius: '50%',
               background: darkMode ? '#93B4FF' : '#1B3A6B',
@@ -782,10 +786,11 @@ const Dashboard = () => {
         </button>
       </div>
 
+      {/* ── CHANGED: Sort banner text updated ── */}
       {sortByJoining && (
         <div className="sort-banner">
           <div className="sort-banner-text">
-            <ArrowUpDown size={13} /> Joining date ke hisaab se sort kiya (purana to naya)
+            <ArrowUpDown size={13} /> Tarikh ke hisaab se sort kiya (1 se 31)
           </div>
           <button className="sort-clear-btn" onClick={() => setSortByJoining(false)}>
             <X size={10} /> Hatao
@@ -799,11 +804,12 @@ const Dashboard = () => {
           <div style={{ textAlign: 'center', color: S.muted, fontSize: 14, padding: '24px 0' }}>Koi student nahi mila</div>
         )}
 
-        {sortByJoining && groupedDisplay && groupedDisplay.map(([monthLabel, groupStudents]) => (
-          <div key={monthLabel}>
+        {/* ── CHANGED: groupedDisplay now uses getJoiningDayLabel ── */}
+        {sortByJoining && groupedDisplay && groupedDisplay.map(([dayLabel, groupStudents]) => (
+          <div key={dayLabel}>
             <div className="month-group-header">
               <div className="month-group-line" />
-              <div className="month-group-label">{monthLabel}</div>
+              <div className="month-group-label">{dayLabel}</div>
               <div className="month-group-line" />
             </div>
             {groupStudents.map(s => (
