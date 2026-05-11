@@ -3,108 +3,128 @@ import { loginStudent, fetchMenu, updateStudentProfile } from '../api';
 import {
   Utensils, Mail, Camera, LogOut, CreditCard, Smartphone,
   ShieldCheck, PhoneCall, ExternalLink, PieChart, History,
-  CheckCircle2, AlertCircle, MessageSquare, Calendar, X, Copy, Check
+  CheckCircle2, AlertCircle, MessageSquare, Calendar, X, Copy,
+  Check, Bell, TrendingUp, Star, Info, ChevronRight, Wifi
 } from 'lucide-react';
 
+/* ─── Google Loader ─────────────────────────────────────────── */
 const GoogleLoader = () => (
-  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#f8fafc' }}>
+  <div style={ls.wrap}>
     <style>{`
-      @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
-      @keyframes colorShift {
-        0%{stroke:#4285F4} 25%{stroke:#EA4335}
-        50%{stroke:#FBBC05} 75%{stroke:#34A853} 100%{stroke:#4285F4}
-      }
-      .google-ring {
-        transform-origin:50px 50px;
-        animation:spin 1s cubic-bezier(0.4,0,0.2,1) infinite, colorShift 3s linear infinite;
-        fill:none; stroke-width:6; stroke-linecap:round; stroke-dasharray:120 60;
-      }
+      @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+      @keyframes cs{0%{stroke:#4285F4}25%{stroke:#EA4335}50%{stroke:#FBBC05}75%{stroke:#34A853}100%{stroke:#4285F4}}
+      .gr{transform-origin:50px 50px;animation:spin 1s cubic-bezier(.4,0,.2,1) infinite,cs 3s linear infinite;
+          fill:none;stroke-width:6;stroke-linecap:round;stroke-dasharray:120 60}
     `}</style>
-    <svg width="80" height="80" viewBox="0 0 100 100">
+    <svg width="72" height="72" viewBox="0 0 100 100">
       <circle cx="50" cy="50" r="38" fill="none" stroke="#e2e8f0" strokeWidth="6"/>
-      <circle className="google-ring" cx="50" cy="50" r="38"/>
+      <circle className="gr" cx="50" cy="50" r="38"/>
     </svg>
-    <p style={{ marginTop:'20px', color:'#64748b', fontWeight:'600', fontFamily:'system-ui' }}>Syncing Dashboard...</p>
+    <p style={ls.txt}>Loading your dashboard…</p>
   </div>
 );
+const ls = {
+  wrap:{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+         minHeight:'100vh', background:'#f9fafb', gap:'20px' },
+  txt: { color:'#6b7280', fontWeight:'600', fontFamily:'system-ui', fontSize:'14px', margin:0 }
+};
 
+/* ─── Main Component ─────────────────────────────────────────── */
 const StudentPortal = () => {
-  const [phone, setPhone]       = useState('');
-  const [password, setPassword] = useState('');
-  const [data, setData]         = useState(null);
-  const [menu, setMenu]         = useState(null);
-  const [error, setError]       = useState('');
-  const [isEditing, setIsEditing]       = useState(false);
-  const [isLoading, setIsLoading]       = useState(false);
-  const [showPayModal, setShowPayModal] = useState(false);
-  const [copied, setCopied]     = useState(false);
+  const [phone,       setPhone]       = useState('');
+  const [password,    setPassword]    = useState('');
+  const [data,        setData]        = useState(null);
+  const [menu,        setMenu]        = useState(null);
+  const [error,       setError]       = useState('');
+  const [isEditing,   setIsEditing]   = useState(false);
+  const [isLoading,   setIsLoading]   = useState(false);
+  const [showPayModal,setShowPayModal]= useState(false);
+  const [copied,      setCopied]      = useState(false);
+  const [activeTab,   setActiveTab]   = useState('home'); // home | attendance | profile
+  const [notification,setNotification]= useState(null);
+  const [editForm,    setEditForm]    = useState({ address:'', emergencyContact:'', profilePic:'', email:'' });
 
-  const [editForm, setEditForm] = useState({
-    address:'', emergencyContact:'', profilePic:'', email:''
-  });
+  const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const todayName = DAYS[new Date().getDay()];
+  const todayDate = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
 
-  const todayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date().getDay()];
-
+  /* load saved session */
   useEffect(() => {
-    const savedData = localStorage.getItem('studentPortalData');
-    if (savedData) {
+    const saved = localStorage.getItem('studentPortalData');
+    if (saved) {
       try {
-        const parsed = JSON.parse(savedData);
+        const parsed = JSON.parse(saved);
         setData(parsed);
         setEditForm({
-          address: parsed.student?.address || '',
+          address:          parsed.student?.address          || '',
           emergencyContact: parsed.student?.emergencyContact || '',
-          profilePic: parsed.student?.profilePic || '',
-          email: parsed.student?.email || ''
+          profilePic:       parsed.student?.profilePic       || '',
+          email:            parsed.student?.email            || ''
         });
-        const loadMenu = async () => {
+        (async () => {
           try {
             const menuRes = await fetchMenu();
             setMenu(menuRes.data.find(m => m.day === todayName));
           } catch (e) { console.error(e); }
-        };
-        loadMenu();
-      } catch (e) { localStorage.removeItem('studentPortalData'); }
+        })();
+      } catch { localStorage.removeItem('studentPortalData'); }
     }
   }, [todayName]);
 
+  /* login */
   const handleLogin = async () => {
-    if (!phone || !password) return alert("Phone and PIN are required!");
+    if (!phone || !password) return alert('Phone and PIN are required!');
     setIsLoading(true); setError('');
     try {
       const res = await loginStudent({ phone, password });
       localStorage.setItem('studentPortalData', JSON.stringify(res.data));
       setData(res.data);
       setEditForm({
-        address: res.data.student?.address || '',
+        address:          res.data.student?.address          || '',
         emergencyContact: res.data.student?.emergencyContact || '',
-        profilePic: res.data.student?.profilePic || '',
-        email: res.data.student?.email || ''
+        profilePic:       res.data.student?.profilePic       || '',
+        email:            res.data.student?.email            || ''
       });
       const menuRes = await fetchMenu();
       setMenu(menuRes.data.find(m => m.day === todayName));
     } catch (err) {
-      setError(err.response?.data?.msg || "Login failed! Please check credentials.");
+      setError(err.response?.data?.msg || 'Login failed! Please check credentials.');
     } finally { setIsLoading(false); }
   };
 
+  /* logout */
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
+    if (window.confirm('Are you sure you want to logout?')) {
       localStorage.removeItem('studentPortalData');
       setData(null);
     }
   };
 
+  /* profile update */
   const handleUpdate = async () => {
     try {
       await updateStudentProfile(data.student._id, editForm);
-      const updatedData = { ...data, student: { ...data.student, ...editForm } };
-      localStorage.setItem('studentPortalData', JSON.stringify(updatedData));
-      setData(updatedData);
+      const updated = { ...data, student: { ...data.student, ...editForm } };
+      localStorage.setItem('studentPortalData', JSON.stringify(updated));
+      setData(updated);
       setIsEditing(false);
-      alert("Profile updated! ✨");
-    } catch (e) { alert("Update failed!"); }
+      showNotif('Profile updated successfully ✨', 'success');
+    } catch { showNotif('Update failed. Try again.', 'error'); }
   };
+
+  /* notification helper */
+  const showNotif = (msg, type = 'success') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  /* UPI constants */
+  const upiId     = '9669168716@ybl';
+  const amount    = data?.student?.totalDue || 0;
+  const upiString = `upi://pay?pa=${upiId}&pn=Didi%20Mess&am=${amount}&cu=INR`;
+  const qrUrl     = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiString)}`;
+  const gpayUrl   = `intent://pay?pa=${upiId}&pn=Didi%20Mess&am=${amount}&cu=INR#Intent;package=com.google.android.apps.nbu.paisa.user;scheme=upi;end`;
+  const phonepeUrl= `phonepe://pay?pa=${upiId}&pn=Didi%20Mess&am=${amount}&cu=INR`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(upiId).then(() => {
@@ -113,204 +133,424 @@ const StudentPortal = () => {
     });
   };
 
-  const upiId  = '9669168716@ybl';
-  const amount = data?.student?.totalDue || 0;
-  const upiString = 'upi://pay?pa=' + upiId + '&pn=Didi%20Mess&am=' + amount + '&cu=INR';
-  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(upiString);
+  /* ── last month bill logic ─────────────────────────────── */
+  const lastMonthBill = data?.student?.lastMonthBill;
+  const hasLastMonthData = lastMonthBill && lastMonthBill > 0;
 
+  /* ── attendance stats ──────────────────────────────────── */
+  const attendanceList = data?.attendance || [];
+  const thisMonthMeals = attendanceList.filter(h => {
+    const d = new Date(h.date);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+
+  const mealCount = (list, type) => list.filter(h => h[type]).length;
+
+  /* ─────────────────────────────────────────────────────────── */
   if (isLoading) return <GoogleLoader />;
 
+  /* ══ LOGIN SCREEN ══════════════════════════════════════════ */
   if (!data) return (
-    <div style={s.loginContainer}>
-      <div style={s.loginBox}>
-        <div style={s.logoBadge}><ShieldCheck size={30} color="#4F46E5"/></div>
-        <h2 style={{ color:'#1e293b', marginBottom:'8px' }}>Didi Mess Portal</h2>
-        <p style={{ fontSize:'13px', color:'#64748b', marginBottom:'24px' }}>Secured Student Access</p>
-        <input type="text" placeholder="Phone Number" style={s.input} onChange={e => setPhone(e.target.value)}/>
-        <input type="password" placeholder="4-Digit PIN" style={s.input} onChange={e => setPassword(e.target.value)}/>
-        <button type="button" onClick={handleLogin} style={s.btnPrimary}>Sign In</button>
-        {error && <p style={{ color:'#ef4444', marginTop:'15px', fontSize:'14px' }}>{error}</p>}
+    <div style={S.loginWrap}>
+      <div style={S.loginCard}>
+        <div style={S.loginLogo}><ShieldCheck size={28} color="#4F46E5"/></div>
+        <h2 style={S.loginTitle}>Didi Mess</h2>
+        <p style={S.loginSub}>Student Portal · Secure Access</p>
+
+        <input
+          type="tel" placeholder="Phone Number" style={S.inp}
+          value={phone} onChange={e => setPhone(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
+        />
+        <input
+          type="password" placeholder="4-Digit PIN" style={S.inp}
+          value={password} onChange={e => setPassword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
+        />
+        <button type="button" onClick={handleLogin} style={S.btnPrimary}>Sign In</button>
+
+        {error && (
+          <div style={S.errBox}>
+            <AlertCircle size={14}/> {error}
+          </div>
+        )}
+
+        <div style={S.loginFooter}>
+          <PhoneCall size={12}/> Need help? Call 6267216334
+        </div>
       </div>
     </div>
   );
 
+  /* ══ DASHBOARD ══════════════════════════════════════════════ */
   return (
-    <div style={s.page}>
+    <div style={S.page}>
 
-      {/* ══════════ PAY MODAL ══════════ */}
+      {/* ── Toast Notification ── */}
+      {notification && (
+        <div style={{
+          ...S.toast,
+          background: notification.type === 'success' ? '#059669' : '#dc2626'
+        }}>
+          {notification.type === 'success' ? <Check size={14}/> : <AlertCircle size={14}/>}
+          {notification.msg}
+        </div>
+      )}
+
+      {/* ══ PAY MODAL ══════════════════════════════════════════ */}
       {showPayModal && (
-        <div style={s.overlay} onClick={() => setShowPayModal(false)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
+        <div style={S.overlay} onClick={() => setShowPayModal(false)}>
+          <div style={S.modal} onClick={e => e.stopPropagation()}>
 
-            <button type="button" onClick={() => setShowPayModal(false)} style={s.closeBtn}>
-              <X size={18}/>
+            <div style={S.modalHandle}/>
+
+            <button type="button" onClick={() => setShowPayModal(false)} style={S.closeBtn}>
+              <X size={16}/>
             </button>
 
-            <h3 style={s.modalTitle}>Pay ₹{amount}</h3>
-            <p style={s.modalSub}>Didi Mess · UPI Payment</p>
+            <h3 style={S.modalTitle}>Pay ₹{amount}</h3>
+            <p style={S.modalSub}>Didi Mess · UPI</p>
 
-            {/* QR Code */}
-            <div style={s.qrWrapper}>
-              <div style={s.qrInner}>
-                <img src={qrUrl} alt="UPI QR Code" style={s.qrImg}/>
-              </div>
-              <p style={s.qrHint}>📱 Kisi bhi UPI app se scan karo</p>
-              <div style={s.appLogos}>
-                <span style={s.appPill}>GPay</span>
-                <span style={s.appPill}>PhonePe</span>
-                <span style={s.appPill}>Paytm</span>
-                <span style={s.appPill}>BHIM</span>
-              </div>
+            {/* Quick UPI App buttons */}
+            <div style={S.quickPayRow}>
+              <button type="button" style={S.quickPayBtn}
+                onClick={() => window.open(gpayUrl, '_blank')}>
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Google_Pay_Logo.svg/120px-Google_Pay_Logo.svg.png"
+                  alt="GPay" style={{ width:28, height:28, objectFit:'contain' }}/>
+                <span style={S.quickPayLabel}>GPay</span>
+              </button>
+
+              <button type="button" style={S.quickPayBtn}
+                onClick={() => window.open(phonepeUrl, '_blank')}>
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/PhonePe_Logo.svg/120px-PhonePe_Logo.svg.png"
+                  alt="PhonePe" style={{ width:28, height:28, objectFit:'contain' }}/>
+                <span style={S.quickPayLabel}>PhonePe</span>
+              </button>
+
+              <button type="button" style={S.quickPayBtn}
+                onClick={() => window.open(upiString, '_blank')}>
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/120px-UPI-Logo-vector.svg.png"
+                  alt="UPI" style={{ width:28, height:28, objectFit:'contain' }}/>
+                <span style={S.quickPayLabel}>Any UPI</span>
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div style={S.divRow}>
+              <div style={S.divLine}/><span style={S.divTxt}>or scan QR code</span><div style={S.divLine}/>
+            </div>
+
+            {/* QR */}
+            <div style={S.qrBox}>
+              <img src={qrUrl} alt="QR" style={S.qrImg}/>
             </div>
 
             {/* Amount chip */}
-            <div style={s.amountChip}>₹{amount} &nbsp;·&nbsp; Didi Mess</div>
-
-            {/* Divider */}
-            <div style={s.divRow}>
-              <div style={s.divLine}/><span style={s.divTxt}>ya UPI ID se bhejo</span><div style={s.divLine}/>
-            </div>
+            <div style={S.amountChip}>₹{amount} · Didi Mess</div>
 
             {/* UPI ID copy */}
-            <div style={s.upiRow}>
-              <Smartphone size={15} color="#4f46e5" style={{ flexShrink:0 }}/>
-              <span style={s.upiText}>{upiId}</span>
+            <div style={S.upiRow}>
+              <Smartphone size={14} color="#4f46e5" style={{ flexShrink:0 }}/>
+              <span style={S.upiTxt}>{upiId}</span>
               <button type="button" onClick={handleCopy} style={{
-                ...s.copyBtn,
+                ...S.copyBtn,
                 background: copied ? '#dcfce7' : '#ede9fe',
                 color:      copied ? '#16a34a' : '#4f46e5',
               }}>
                 {copied
-                  ? <span style={{ display:'flex', alignItems:'center', gap:'4px' }}><Check size={12}/> Copied!</span>
-                  : <span style={{ display:'flex', alignItems:'center', gap:'4px' }}><Copy size={12}/> Copy</span>
+                  ? <><Check size={11}/> Copied</>
+                  : <><Copy size={11}/> Copy</>
                 }
               </button>
             </div>
 
-            {/* Step guide */}
-            <div style={s.tipBox}>
-              <p style={{ margin:'0 0 6px 0', fontWeight:'700', fontSize:'12px', color:'#92400e' }}>📋 Steps:</p>
-              <p style={{ margin:0, fontSize:'11px', color:'#78350f', lineHeight:'1.8' }}>
-                <b>QR se:</b> GPay/PhonePe/Paytm kholo → Scan karo → Pay karo<br/>
-                <b>UPI ID se:</b> Copy karo → App mein "Pay to contact/UPI" → Paste → ₹{amount}
-              </p>
-            </div>
-
-            <button type="button" onClick={() => setShowPayModal(false)} style={s.doneBtn}>
+            <button type="button" onClick={() => setShowPayModal(false)} style={S.doneBtn}>
               Done ✓
             </button>
           </div>
         </div>
       )}
-      {/* ══════════════════════════════ */}
+      {/* ═══════════════════════════════════════════════════════ */}
 
-      <div style={s.headerRow}>
-        <div style={s.statusTag}><CheckCircle2 size={14}/> Verified</div>
-        <div style={{...s.statusTag, background:'#fffbeb', color:'#b45309'}}>
-          <AlertCircle size={14}/> Due: 01 June
+      {/* ── Top Bar ── */}
+      <div style={S.topBar}>
+        <div>
+          <p style={S.greeting}>Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'} 👋</p>
+          <h3 style={S.greetName}>{data.student?.name?.split(' ')[0] || 'Student'}</h3>
+        </div>
+        <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
+          <div style={S.verifiedPill}><CheckCircle2 size={12}/> Verified</div>
+          <button type="button" onClick={handleLogout} style={S.iconBtn}>
+            <LogOut size={16} color="#ef4444"/>
+          </button>
         </div>
       </div>
 
-      <div style={s.cardMain}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h4 style={s.cardTitle}><Utensils size={18}/> Today's Meal</h4>
-          <span style={s.dateBadge}>{todayName}</span>
-        </div>
-        <p style={s.dishName}>{menu ? menu.dish : "Updating Menu..."}</p>
-        <div style={s.servingInfo}><History size={14}/> Standard Mess Cycle</div>
+      {/* ── Due Alert ── */}
+      <div style={S.dueAlert}>
+        <AlertCircle size={14} color="#b45309"/>
+        <span style={{ fontSize:'12px', color:'#92400e', fontWeight:'600' }}>Payment due: 1st June 2025</span>
+        <button type="button" onClick={() => setShowPayModal(true)} style={S.duePayBtn}>Pay Now</button>
       </div>
 
-      <div style={s.statsGrid}>
-        <div style={s.statBlue}>
-          <PieChart size={16}/>
-          <p style={s.statsLabel}>Last Month</p>
-          <h4 style={{ margin:0 }}>₹{data.student?.lastMonthBill || '1850'}</h4>
-        </div>
-        <div style={s.statGreen}>
-          <Calendar size={16}/>
-          <p style={s.statsLabel}>This Month</p>
-          <h4 style={{ margin:0 }}>{data.attendance?.length || 0} Meals</h4>
-        </div>
-      </div>
-
-      <div style={s.cardStandard}>
-        <div style={{ display:'flex', gap:'15px', alignItems:'center' }}>
-          <div style={{ position:'relative' }}>
-            <img
-              src={data.student?.profilePic || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"}
-              style={s.profileImg} alt="user"
-            />
-            <button type="button" onClick={() => setIsEditing(true)} style={s.editBtn}>
-              <Camera size={10} color="white"/>
-            </button>
-          </div>
-          <div>
-            <h3 style={s.userName}>{data.student?.name}</h3>
-            <p style={s.userMeta}>ID: {data.student?.phone}</p>
-          </div>
-        </div>
-        {isEditing && (
-          <div style={s.editSection}>
-            <input style={s.input} value={editForm.email} placeholder="Email"
-              onChange={e => setEditForm({...editForm, email:e.target.value})}/>
-            <input style={s.input} value={editForm.address} placeholder="Address"
-              onChange={e => setEditForm({...editForm, address:e.target.value})}/>
-            <button type="button" onClick={handleUpdate} style={s.btnPrimary}>Update</button>
-            <button type="button" onClick={() => setIsEditing(false)}
-              style={{...s.btnSecondary, marginTop:'8px'}}>Cancel</button>
-          </div>
-        )}
-      </div>
-
-      <div style={s.payCard}>
-        <div style={{ display:'flex', justifyContent:'space-between', opacity:0.8 }}>
-          <span>Total Outstanding</span><CreditCard size={18}/>
-        </div>
-        <h1 style={s.billAmount}>₹{amount}</h1>
-        <button type="button" onClick={() => setShowPayModal(true)} style={s.payBtn}>
-          <Smartphone size={18}/> Pay via UPI
-        </button>
-      </div>
-
-      <h4 style={s.sectionHeader}>Attendance History</h4>
-      <div style={s.historyBox}>
-        {data.attendance?.slice(0,5).map((h,i) => (
-          <div key={i} style={s.historyItem}>
-            <div>
-              <div style={{ fontWeight:'600', fontSize:'13px' }}>{new Date(h.date).toLocaleDateString('en-GB')}</div>
-              <div style={{ fontSize:'10px', color:'#94a3b8' }}>Entry Logged</div>
-            </div>
-            <div style={{ display:'flex', gap:'6px' }}>
-              {h.breakfast && <span style={s.mealTag('#fef3c7','#d97706')}>B</span>}
-              {h.lunch     && <span style={s.mealTag('#dcfce7','#16a34a')}>L</span>}
-              {h.dinner    && <span style={s.mealTag('#e0e7ff','#4f46e5')}>D</span>}
-            </div>
-          </div>
+      {/* ── Tab Nav ── */}
+      <div style={S.tabBar}>
+        {['home','attendance','profile'].map(tab => (
+          <button key={tab} type="button"
+            onClick={() => setActiveTab(tab)}
+            style={{ ...S.tab, ...(activeTab === tab ? S.tabActive : {}) }}>
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
         ))}
       </div>
 
-      <div style={s.supportBox}>
-        <p style={{ fontSize:'12px', color:'#0c4a6e', marginBottom:'10px' }}>Facing issues? Contact support.</p>
-        <a href="https://wa.me/6267216334" style={s.supportBtn}><MessageSquare size={16}/> WhatsApp Didi</a>
-      </div>
+      {/* ═══════════════════ HOME TAB ═════════════════════════ */}
+      {activeTab === 'home' && (
+        <>
+          {/* Today's Meal */}
+          <div style={S.mealCard}>
+            <div style={S.mealCardTop}>
+              <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                <div style={S.mealIcon}><Utensils size={16} color="#f59e0b"/></div>
+                <span style={S.mealLabel}>Today's Meal</span>
+              </div>
+              <span style={S.dayBadge}>{todayName}</span>
+            </div>
+            <p style={S.dishName}>{menu ? menu.dish : 'Menu updating…'}</p>
+            <div style={S.mealMeta}>
+              <History size={12}/> Standard Mess Cycle &nbsp;·&nbsp; {todayDate}
+            </div>
+          </div>
 
-      <button type="button" onClick={handleLogout} style={s.logoutBtn}>
-        <LogOut size={16}/> Logout
-      </button>
+          {/* Stats Grid */}
+          <div style={S.statsGrid}>
+            <div style={S.statCard('#eff6ff','#1e40af')}>
+              <PieChart size={16}/>
+              <p style={S.statLabel}>Last Month</p>
+              {hasLastMonthData
+                ? <h4 style={S.statVal}>₹{lastMonthBill}</h4>
+                : <p style={S.statNA}>Available after<br/>1st month</p>
+              }
+            </div>
+            <div style={S.statCard('#f0fdf4','#166534')}>
+              <Calendar size={16}/>
+              <p style={S.statLabel}>This Month</p>
+              <h4 style={S.statVal}>{thisMonthMeals.length} Meals</h4>
+            </div>
+            <div style={S.statCard('#fdf4ff','#7e22ce')}>
+              <TrendingUp size={16}/>
+              <p style={S.statLabel}>Breakfast</p>
+              <h4 style={S.statVal}>{mealCount(thisMonthMeals,'breakfast')}</h4>
+            </div>
+            <div style={S.statCard('#fff7ed','#c2410c')}>
+              <Star size={16}/>
+              <p style={S.statLabel}>Dinner</p>
+              <h4 style={S.statVal}>{mealCount(thisMonthMeals,'dinner')}</h4>
+            </div>
+          </div>
 
-      <footer style={s.footer}>
-        <div style={s.footerLine}></div>
-        <div style={{ display:'flex', justifyContent:'center', gap:'20px', margin:'20px 0' }}>
-          <a href="tel:6267216334" style={s.footerLink}><PhoneCall size={18}/></a>
-          <a href="mailto:jivankarsh87@gmail.com" style={s.footerLink}><Mail size={18}/></a>
-          <a href="https://github.com/jivankarsh" style={s.footerLink}><ExternalLink size={18}/></a>
+          {/* Payment Card */}
+          <div style={S.payCard}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', opacity:0.85 }}>
+              <span style={{ fontSize:'13px', fontWeight:'600' }}>Total Outstanding</span>
+              <CreditCard size={18}/>
+            </div>
+            <h1 style={S.billAmt}>₹{amount}</h1>
+            <button type="button" onClick={() => setShowPayModal(true)} style={S.payBtn}>
+              <Smartphone size={16}/> Pay via UPI
+            </button>
+          </div>
+
+          {/* Recent Attendance */}
+          <div style={S.section}>
+            <div style={S.sectionHead}>
+              <span style={S.sectionTitle}>Recent Meals</span>
+              <button type="button" onClick={() => setActiveTab('attendance')} style={S.seeAll}>
+                See all <ChevronRight size={12}/>
+              </button>
+            </div>
+            {attendanceList.slice(0,4).map((h,i) => (
+              <div key={i} style={S.histItem}>
+                <div>
+                  <div style={{ fontWeight:'600', fontSize:'13px', color:'#1e293b' }}>
+                    {new Date(h.date).toLocaleDateString('en-GB',{ day:'2-digit', month:'short', year:'numeric' })}
+                  </div>
+                  <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' }}>Entry logged</div>
+                </div>
+                <div style={{ display:'flex', gap:'6px' }}>
+                  {h.breakfast && <span style={S.mealTag('#fef3c7','#d97706')}>B</span>}
+                  {h.lunch     && <span style={S.mealTag('#dcfce7','#16a34a')}>L</span>}
+                  {h.dinner    && <span style={S.mealTag('#e0e7ff','#4f46e5')}>D</span>}
+                </div>
+              </div>
+            ))}
+            {attendanceList.length === 0 && (
+              <div style={S.emptyState}>No attendance records yet.</div>
+            )}
+          </div>
+
+          {/* Support */}
+          <div style={S.supportBox}>
+            <p style={{ fontSize:'12px', color:'#0c4a6e', margin:'0 0 10px 0', fontWeight:'600' }}>
+              Need help? We're here for you.
+            </p>
+            <a href="https://wa.me/6267216334" style={S.waBtn}>
+              <MessageSquare size={15}/> WhatsApp Support
+            </a>
+          </div>
+        </>
+      )}
+
+      {/* ═══════════════════ ATTENDANCE TAB ══════════════════ */}
+      {activeTab === 'attendance' && (
+        <>
+          {/* Monthly Summary */}
+          <div style={S.attendSummary}>
+            <div style={S.attendStat}>
+              <h3 style={{ margin:0, fontSize:'24px', fontWeight:'800', color:'#1e293b' }}>
+                {thisMonthMeals.length}
+              </h3>
+              <p style={{ margin:0, fontSize:'11px', color:'#64748b' }}>Total Meals</p>
+            </div>
+            <div style={S.attendDivider}/>
+            <div style={S.attendStat}>
+              <h3 style={{ margin:0, fontSize:'24px', fontWeight:'800', color:'#f59e0b' }}>
+                {mealCount(thisMonthMeals,'breakfast')}
+              </h3>
+              <p style={{ margin:0, fontSize:'11px', color:'#64748b' }}>Breakfast</p>
+            </div>
+            <div style={S.attendDivider}/>
+            <div style={S.attendStat}>
+              <h3 style={{ margin:0, fontSize:'24px', fontWeight:'800', color:'#16a34a' }}>
+                {mealCount(thisMonthMeals,'lunch')}
+              </h3>
+              <p style={{ margin:0, fontSize:'11px', color:'#64748b' }}>Lunch</p>
+            </div>
+            <div style={S.attendDivider}/>
+            <div style={S.attendStat}>
+              <h3 style={{ margin:0, fontSize:'24px', fontWeight:'800', color:'#4f46e5' }}>
+                {mealCount(thisMonthMeals,'dinner')}
+              </h3>
+              <p style={{ margin:0, fontSize:'11px', color:'#64748b' }}>Dinner</p>
+            </div>
+          </div>
+
+          <div style={S.section}>
+            <p style={S.sectionTitle}>Full History</p>
+            <div style={{ maxHeight:'400px', overflowY:'auto' }}>
+              {attendanceList.length > 0
+                ? attendanceList.map((h,i) => (
+                  <div key={i} style={S.histItem}>
+                    <div>
+                      <div style={{ fontWeight:'600', fontSize:'13px', color:'#1e293b' }}>
+                        {new Date(h.date).toLocaleDateString('en-GB',{ day:'2-digit', month:'short', year:'numeric' })}
+                      </div>
+                      <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' }}>
+                        {[h.breakfast && 'Breakfast', h.lunch && 'Lunch', h.dinner && 'Dinner']
+                          .filter(Boolean).join(' · ') || 'No meals'}
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:'5px' }}>
+                      {h.breakfast && <span style={S.mealTag('#fef3c7','#d97706')}>B</span>}
+                      {h.lunch     && <span style={S.mealTag('#dcfce7','#16a34a')}>L</span>}
+                      {h.dinner    && <span style={S.mealTag('#e0e7ff','#4f46e5')}>D</span>}
+                    </div>
+                  </div>
+                ))
+                : <div style={S.emptyState}>No attendance records yet.</div>
+              }
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ═══════════════════ PROFILE TAB ═════════════════════ */}
+      {activeTab === 'profile' && (
+        <>
+          <div style={S.profileCard}>
+            <div style={{ position:'relative', width:'fit-content', margin:'0 auto 16px auto' }}>
+              <img
+                src={data.student?.profilePic || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'}
+                style={S.profileImg} alt="profile"
+              />
+              <button type="button" onClick={() => setIsEditing(true)} style={S.camBtn}>
+                <Camera size={11} color="#fff"/>
+              </button>
+            </div>
+            <h3 style={{ margin:'0 0 4px 0', fontSize:'18px', fontWeight:'800', color:'#1e293b', textAlign:'center' }}>
+              {data.student?.name}
+            </h3>
+            <p style={{ margin:0, fontSize:'12px', color:'#64748b', textAlign:'center' }}>
+              ID: {data.student?.phone}
+            </p>
+          </div>
+
+          {/* Info Rows */}
+          <div style={S.infoCard}>
+            {[
+              { label:'Email', value: data.student?.email || '—' },
+              { label:'Address', value: data.student?.address || '—' },
+              { label:'Emergency Contact', value: data.student?.emergencyContact || '—' },
+            ].map(({ label, value }) => (
+              <div key={label} style={S.infoRow}>
+                <span style={S.infoLabel}>{label}</span>
+                <span style={S.infoVal}>{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {!isEditing && (
+            <button type="button" onClick={() => setIsEditing(true)} style={S.editProfileBtn}>
+              Edit Profile
+            </button>
+          )}
+
+          {isEditing && (
+            <div style={S.editCard}>
+              <p style={S.sectionTitle}>Edit Details</p>
+              {[
+                { key:'email',            ph:'Email address',     type:'email' },
+                { key:'address',          ph:'Home address',      type:'text'  },
+                { key:'emergencyContact', ph:'Emergency contact', type:'tel'   },
+                { key:'profilePic',       ph:'Profile photo URL', type:'url'   },
+              ].map(({ key, ph, type }) => (
+                <input key={key} type={type} placeholder={ph} style={S.inp}
+                  value={editForm[key]}
+                  onChange={e => setEditForm({ ...editForm, [key]: e.target.value })}
+                />
+              ))}
+              <button type="button" onClick={handleUpdate} style={S.btnPrimary}>Save Changes</button>
+              <button type="button" onClick={() => setIsEditing(false)}
+                style={{ ...S.btnSecondary, marginTop:'8px' }}>Cancel</button>
+            </div>
+          )}
+
+          {/* Logout */}
+          <button type="button" onClick={handleLogout} style={S.logoutBtn}>
+            <LogOut size={15}/> Logout
+          </button>
+        </>
+      )}
+
+      {/* ── Footer ── */}
+      <footer style={S.footer}>
+        <div style={S.footerDivider}/>
+        <p style={S.footerBrand}>Didi Mess Solutions</p>
+        <p style={S.footerDev}>Developed by <strong>Jivan Karsh</strong></p>
+        <div style={S.footerLinks}>
+          <a href="tel:6267216334"            style={S.footerLink} title="Call us"><PhoneCall size={16}/></a>
+          <a href="mailto:jivankarsh87@gmail.com" style={S.footerLink} title="Email us"><Mail size={16}/></a>
+          <a href="https://wa.me/6267216334"  style={S.footerLink} title="WhatsApp"><MessageSquare size={16}/></a>
+          <a href="https://github.com/jivankarsh" style={S.footerLink} target="_blank" rel="noopener noreferrer" title="GitHub"><ExternalLink size={16}/></a>
         </div>
-        <p style={{ fontWeight:'800', fontSize:'14px', color:'#1e293b' }}>Didi Mess Solutions</p>
-        <p style={{ fontSize:'11px', color:'#64748b' }}>Developed by Jivan Karsh</p>
-        <div style={s.footerBottom}>
-          <span>v2.8.0</span>
+        <div style={S.footerMeta}>
+          <span>v2.9.0</span>
           <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
-            <div style={s.statusDot}></div><span>Secure</span>
+            <div style={S.dot}/> Secure
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+            <Wifi size={10}/> Live
           </div>
         </div>
       </footer>
@@ -318,68 +558,216 @@ const StudentPortal = () => {
   );
 };
 
-const s = {
-  page:          { padding:'15px', maxWidth:'480px', margin:'auto', background:'#f8fafc', minHeight:'100vh', fontFamily:'system-ui' },
-  loginContainer:{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#f1f5f9' },
-  loginBox:      { background:'#fff', padding:'30px', borderRadius:'28px', boxShadow:'0 10px 25px rgba(0,0,0,0.05)', textAlign:'center', width:'90%', maxWidth:'360px' },
-  logoBadge:     { width:'60px', height:'60px', background:'#e0e7ff', borderRadius:'20px', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px auto' },
-  input:         { width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'12px', border:'1px solid #e2e8f0', outline:'none', boxSizing:'border-box', fontSize:'14px' },
-  btnPrimary:    { width:'100%', padding:'14px', background:'#1e293b', color:'#fff', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer', fontSize:'14px' },
-  btnSecondary:  { width:'100%', padding:'12px', background:'#fff', color:'#475569', border:'1px solid #e2e8f0', borderRadius:'12px', fontWeight:'600', cursor:'pointer' },
-  headerRow:     { display:'flex', justifyContent:'space-between', marginBottom:'15px' },
-  statusTag:     { fontSize:'11px', display:'flex', alignItems:'center', gap:'5px', background:'#f0fdf4', color:'#166534', padding:'5px 12px', borderRadius:'20px', fontWeight:'600' },
-  cardMain:      { background:'#fff', padding:'18px', borderRadius:'20px', marginBottom:'15px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)' },
-  cardTitle:     { margin:0, color:'#f59e0b', display:'flex', alignItems:'center', gap:'8px', fontSize:'14px' },
-  dateBadge:     { background:'#fffbeb', color:'#b45309', padding:'4px 10px', borderRadius:'8px', fontSize:'11px', fontWeight:'800' },
-  dishName:      { fontSize:'22px', fontWeight:'800', margin:'15px 0 5px 0', color:'#1e293b' },
-  servingInfo:   { display:'flex', alignItems:'center', gap:'5px', color:'#64748b', fontSize:'12px' },
-  statsGrid:     { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'15px' },
-  statBlue:      { background:'#eff6ff', color:'#1e40af', padding:'15px', borderRadius:'18px' },
-  statGreen:     { background:'#f0fdf4', color:'#166534', padding:'15px', borderRadius:'18px' },
-  statsLabel:    { margin:'5px 0 0 0', fontSize:'11px', opacity:0.8 },
-  cardStandard:  { background:'#fff', padding:'18px', borderRadius:'20px', marginBottom:'15px', border:'1px solid #f1f5f9' },
-  profileImg:    { width:'60px', height:'60px', borderRadius:'15px', objectFit:'cover' },
-  editBtn:       { position:'absolute', bottom:'-5px', right:'-5px', background:'#1e293b', border:'2px solid #fff', borderRadius:'50%', padding:'6px', cursor:'pointer' },
-  userName:      { margin:0, color:'#0f172a', fontSize:'16px' },
-  userMeta:      { margin:0, fontSize:'12px', color:'#64748b' },
-  editSection:   { marginTop:'15px', background:'#f8fafc', padding:'12px', borderRadius:'12px' },
-  payCard:       { background:'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)', padding:'25px', borderRadius:'24px', marginBottom:'20px', color:'#fff' },
-  billAmount:    { color:'#fff', fontSize:'34px', margin:'10px 0', fontWeight:'800' },
-  payBtn:        { width:'100%', padding:'14px', background:'#fff', color:'#4f46e5', border:'none', borderRadius:'12px', fontWeight:'800', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', cursor:'pointer', marginTop:'15px', fontSize:'14px' },
-  sectionHeader: { color:'#475569', fontSize:'14px', fontWeight:'700', margin:'0 0 10px 0' },
-  historyBox:    { maxHeight:'180px', overflowY:'auto', marginBottom:'20px' },
-  historyItem:   { display:'flex', justifyContent:'space-between', padding:'12px', background:'#fff', borderRadius:'15px', marginBottom:'8px', border:'1px solid #f1f5f9' },
-  mealTag:       (bg,color) => ({ background:bg, color, padding:'2px 8px', borderRadius:'6px', fontSize:'10px', fontWeight:'900' }),
-  supportBox:    { background:'#f0f9ff', border:'1px solid #bae6fd', textAlign:'center', padding:'15px', borderRadius:'20px', marginBottom:'15px' },
-  supportBtn:    { display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', background:'#25d366', color:'#fff', textDecoration:'none', padding:'10px', borderRadius:'12px', fontSize:'13px', fontWeight:'700' },
-  logoutBtn:     { width:'100%', padding:'12px', background:'#fff', color:'#ef4444', border:'1px solid #fee2e2', borderRadius:'12px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', cursor:'pointer' },
-  footer:        { textAlign:'center', marginTop:'30px', paddingBottom:'20px' },
-  footerLine:    { height:'1px', background:'linear-gradient(90deg,transparent,#e2e8f0,transparent)' },
-  footerLink:    { padding:'12px', background:'#fff', borderRadius:'12px', color:'#1e293b', display:'flex', boxShadow:'0 2px 5px rgba(0,0,0,0.05)' },
-  footerBottom:  { display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'20px', fontSize:'10px', color:'#94a3b8', padding:'0 5px' },
-  statusDot:     { width:'6px', height:'6px', background:'#22c55e', borderRadius:'50%' },
+/* ─── Styles ─────────────────────────────────────────────────── */
+const S = {
+  /* page */
+  page:     { padding:'16px', maxWidth:'480px', margin:'0 auto', background:'#f8fafc',
+               minHeight:'100vh', fontFamily:"'Segoe UI', system-ui, sans-serif", boxSizing:'border-box' },
+
+  /* toast */
+  toast:    { position:'fixed', top:'16px', left:'50%', transform:'translateX(-50%)',
+               display:'flex', alignItems:'center', gap:'8px', padding:'10px 18px',
+               borderRadius:'20px', color:'#fff', fontSize:'13px', fontWeight:'600',
+               zIndex:10000, boxShadow:'0 4px 20px rgba(0,0,0,0.15)', whiteSpace:'nowrap' },
+
+  /* login */
+  loginWrap: { display:'flex', alignItems:'center', justifyContent:'center',
+               minHeight:'100vh', background:'#f1f5f9', padding:'20px', boxSizing:'border-box' },
+  loginCard: { background:'#fff', padding:'32px 24px', borderRadius:'28px',
+               boxShadow:'0 10px 40px rgba(0,0,0,0.08)', textAlign:'center',
+               width:'100%', maxWidth:'360px', boxSizing:'border-box' },
+  loginLogo: { width:'56px', height:'56px', background:'#e0e7ff', borderRadius:'18px',
+               display:'flex', alignItems:'center', justifyContent:'center',
+               margin:'0 auto 18px auto' },
+  loginTitle:{ margin:'0 0 6px 0', fontSize:'22px', fontWeight:'800', color:'#1e293b' },
+  loginSub:  { margin:'0 0 24px 0', fontSize:'13px', color:'#64748b' },
+  loginFooter:{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
+                marginTop:'20px', fontSize:'11px', color:'#94a3b8' },
+  errBox:    { display:'flex', alignItems:'center', gap:'6px', justifyContent:'center',
+               color:'#ef4444', marginTop:'14px', fontSize:'13px',
+               background:'#fef2f2', padding:'10px', borderRadius:'10px' },
+
+  /* inputs / buttons */
+  inp:       { width:'100%', padding:'13px 14px', marginBottom:'10px', borderRadius:'12px',
+               border:'1.5px solid #e2e8f0', outline:'none', boxSizing:'border-box',
+               fontSize:'14px', background:'#f9fafb', transition:'border-color .2s',
+               display:'block' },
+  btnPrimary:{ width:'100%', padding:'14px', background:'#1e293b', color:'#fff',
+               border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer',
+               fontSize:'14px', display:'block' },
+  btnSecondary:{ width:'100%', padding:'12px', background:'#fff', color:'#475569',
+                 border:'1.5px solid #e2e8f0', borderRadius:'12px', fontWeight:'600',
+                 cursor:'pointer', display:'block' },
+
+  /* top bar */
+  topBar:   { display:'flex', justifyContent:'space-between', alignItems:'center',
+               marginBottom:'14px' },
+  greeting: { margin:'0 0 2px 0', fontSize:'12px', color:'#64748b' },
+  greetName:{ margin:0, fontSize:'20px', fontWeight:'800', color:'#1e293b' },
+  verifiedPill:{ fontSize:'11px', display:'flex', alignItems:'center', gap:'4px',
+                  background:'#f0fdf4', color:'#166534', padding:'5px 10px',
+                  borderRadius:'20px', fontWeight:'700' },
+  iconBtn:  { background:'#fff', border:'1.5px solid #fee2e2', borderRadius:'12px',
+               padding:'8px', cursor:'pointer', display:'flex', alignItems:'center' },
+
+  /* due alert */
+  dueAlert: { display:'flex', alignItems:'center', gap:'8px', background:'#fffbeb',
+               border:'1.5px solid #fde68a', borderRadius:'14px', padding:'10px 14px',
+               marginBottom:'14px' },
+  duePayBtn:{ marginLeft:'auto', background:'#f59e0b', color:'#fff', border:'none',
+               borderRadius:'8px', padding:'5px 12px', fontSize:'11px', fontWeight:'800',
+               cursor:'pointer' },
+
+  /* tab bar */
+  tabBar:   { display:'flex', background:'#f1f5f9', borderRadius:'14px',
+               padding:'4px', marginBottom:'16px', gap:'4px' },
+  tab:      { flex:1, padding:'9px', border:'none', background:'transparent',
+               borderRadius:'10px', fontWeight:'600', fontSize:'13px', color:'#64748b',
+               cursor:'pointer', transition:'all .2s' },
+  tabActive:{ background:'#fff', color:'#1e293b', boxShadow:'0 2px 8px rgba(0,0,0,0.08)' },
+
+  /* meal card */
+  mealCard: { background:'#fff', padding:'18px', borderRadius:'20px', marginBottom:'14px',
+               boxShadow:'0 4px 20px rgba(0,0,0,0.05)' },
+  mealCardTop:{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                marginBottom:'10px' },
+  mealIcon: { width:'32px', height:'32px', background:'#fffbeb', borderRadius:'10px',
+               display:'flex', alignItems:'center', justifyContent:'center' },
+  mealLabel:{ fontSize:'13px', fontWeight:'700', color:'#92400e' },
+  dayBadge: { background:'#fffbeb', color:'#b45309', padding:'4px 10px',
+               borderRadius:'8px', fontSize:'11px', fontWeight:'800' },
+  dishName: { fontSize:'22px', fontWeight:'800', margin:'0 0 8px 0', color:'#1e293b' },
+  mealMeta: { display:'flex', alignItems:'center', gap:'5px', color:'#94a3b8', fontSize:'11px' },
+
+  /* stats */
+  statsGrid:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'14px' },
+  statCard: (bg,color) => ({
+    background:bg, color, padding:'16px', borderRadius:'18px',
+    display:'flex', flexDirection:'column', gap:'4px'
+  }),
+  statLabel:{ margin:'4px 0 0 0', fontSize:'11px', opacity:0.75, fontWeight:'600' },
+  statVal:  { margin:'2px 0 0 0', fontSize:'20px', fontWeight:'800' },
+  statNA:   { margin:'4px 0 0 0', fontSize:'10px', lineHeight:'1.4', fontWeight:'600', opacity:0.7 },
+
+  /* pay card */
+  payCard:  { background:'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
+               padding:'24px', borderRadius:'24px', marginBottom:'20px', color:'#fff' },
+  billAmt:  { color:'#fff', fontSize:'36px', margin:'10px 0 0 0', fontWeight:'800', letterSpacing:'-1px' },
+  payBtn:   { width:'100%', padding:'14px', background:'#fff', color:'#4f46e5',
+               border:'none', borderRadius:'12px', fontWeight:'800',
+               display:'flex', alignItems:'center', justifyContent:'center',
+               gap:'8px', cursor:'pointer', marginTop:'16px', fontSize:'14px' },
+
+  /* section */
+  section:  { marginBottom:'16px' },
+  sectionHead:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' },
+  sectionTitle:{ fontSize:'14px', fontWeight:'700', color:'#475569' },
+  seeAll:   { display:'flex', alignItems:'center', gap:'2px', background:'none', border:'none',
+               color:'#4f46e5', fontSize:'12px', fontWeight:'600', cursor:'pointer' },
+  histItem: { display:'flex', justifyContent:'space-between', alignItems:'center',
+               padding:'13px 14px', background:'#fff', borderRadius:'14px', marginBottom:'8px',
+               border:'1px solid #f1f5f9' },
+  mealTag:  (bg,color) => ({
+    background:bg, color, padding:'3px 8px', borderRadius:'6px', fontSize:'10px', fontWeight:'900'
+  }),
+  emptyState:{ textAlign:'center', color:'#94a3b8', fontSize:'13px', padding:'30px' },
+
+  /* support */
+  supportBox:{ background:'#f0f9ff', border:'1.5px solid #bae6fd', textAlign:'center',
+               padding:'16px', borderRadius:'20px', marginBottom:'16px' },
+  waBtn:    { display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
+               background:'#25d366', color:'#fff', textDecoration:'none',
+               padding:'11px', borderRadius:'12px', fontSize:'13px', fontWeight:'700' },
+
+  /* attendance tab */
+  attendSummary:{ background:'#fff', borderRadius:'20px', padding:'20px',
+                   display:'flex', justifyContent:'space-around', alignItems:'center',
+                   marginBottom:'16px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)' },
+  attendStat:   { textAlign:'center' },
+  attendDivider:{ width:'1px', height:'40px', background:'#f1f5f9' },
+
+  /* profile tab */
+  profileCard:{ background:'#fff', borderRadius:'24px', padding:'24px',
+                 marginBottom:'14px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)' },
+  profileImg: { width:'80px', height:'80px', borderRadius:'20px', objectFit:'cover',
+                display:'block' },
+  camBtn:     { position:'absolute', bottom:'-6px', right:'-6px', background:'#1e293b',
+                border:'2px solid #fff', borderRadius:'50%', padding:'7px',
+                cursor:'pointer', display:'flex', alignItems:'center' },
+  infoCard:   { background:'#fff', borderRadius:'20px', padding:'6px 16px',
+                marginBottom:'14px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)' },
+  infoRow:    { display:'flex', justifyContent:'space-between', alignItems:'center',
+                padding:'12px 0', borderBottom:'1px solid #f8fafc' },
+  infoLabel:  { fontSize:'12px', color:'#64748b', fontWeight:'600' },
+  infoVal:    { fontSize:'13px', color:'#1e293b', fontWeight:'700', maxWidth:'60%',
+                textAlign:'right', wordBreak:'break-word' },
+  editProfileBtn:{ width:'100%', padding:'14px', background:'#ede9fe', color:'#4f46e5',
+                    border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer',
+                    fontSize:'14px', marginBottom:'12px' },
+  editCard:   { background:'#fff', borderRadius:'20px', padding:'18px',
+                marginBottom:'14px', boxShadow:'0 4px 20px rgba(0,0,0,0.05)' },
+  logoutBtn:  { width:'100%', padding:'13px', background:'#fff', color:'#ef4444',
+                border:'1.5px solid #fee2e2', borderRadius:'12px', fontWeight:'700',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                gap:'8px', cursor:'pointer', marginBottom:'20px' },
 
   /* modal */
-  overlay:    { position:'fixed', inset:0, background:'rgba(15,23,42,0.6)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:9999 },
-  modal:      { background:'#fff', width:'100%', maxWidth:'480px', borderRadius:'28px 28px 0 0', padding:'28px 20px 40px', position:'relative', textAlign:'center', maxHeight:'92vh', overflowY:'auto' },
-  closeBtn:   { position:'absolute', top:'16px', right:'16px', background:'#f1f5f9', border:'none', borderRadius:'50%', width:'34px', height:'34px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#475569' },
+  overlay:    { position:'fixed', inset:0, background:'rgba(15,23,42,0.6)',
+                display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:9999 },
+  modal:      { background:'#fff', width:'100%', maxWidth:'480px',
+                borderRadius:'28px 28px 0 0', padding:'24px 20px 44px',
+                position:'relative', textAlign:'center',
+                maxHeight:'92vh', overflowY:'auto' },
+  modalHandle:{ width:'40px', height:'4px', background:'#e2e8f0', borderRadius:'99px',
+                margin:'0 auto 20px auto' },
+  closeBtn:   { position:'absolute', top:'16px', right:'16px', background:'#f1f5f9',
+                border:'none', borderRadius:'50%', width:'32px', height:'32px',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                cursor:'pointer', color:'#475569' },
   modalTitle: { margin:'0 0 4px 0', fontSize:'20px', color:'#1e293b', fontWeight:'800' },
-  modalSub:   { margin:'0 0 16px 0', fontSize:'12px', color:'#64748b' },
-  qrWrapper:  { background:'linear-gradient(135deg,#f0f9ff,#eff6ff)', borderRadius:'20px', padding:'20px 16px 14px', marginBottom:'16px' },
-  qrInner:    { display:'flex', justifyContent:'center', background:'#fff', borderRadius:'14px', padding:'14px', marginBottom:'10px', boxShadow:'0 2px 12px rgba(0,0,0,0.08)' },
-  qrImg:      { width:'220px', height:'220px', borderRadius:'8px', display:'block' },
-  qrHint:     { fontSize:'12px', color:'#475569', margin:'0 0 8px 0', fontWeight:'600' },
-  appLogos:   { display:'flex', justifyContent:'center', gap:'8px', flexWrap:'wrap' },
-  appPill:    { fontSize:'11px', fontWeight:'700', background:'#fff', color:'#4f46e5', padding:'4px 12px', borderRadius:'20px', border:'1px solid #c7d2fe' },
-  amountChip: { display:'inline-block', background:'#ede9fe', color:'#4f46e5', padding:'7px 20px', borderRadius:'20px', fontSize:'14px', fontWeight:'800', marginBottom:'14px' },
-  divRow:     { display:'flex', alignItems:'center', gap:'10px', margin:'4px 0 14px 0' },
+  modalSub:   { margin:'0 0 18px 0', fontSize:'12px', color:'#64748b' },
+
+  /* quick pay */
+  quickPayRow:{ display:'flex', justifyContent:'center', gap:'12px', marginBottom:'16px' },
+  quickPayBtn:{ display:'flex', flexDirection:'column', alignItems:'center', gap:'6px',
+                background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:'16px',
+                padding:'12px 16px', cursor:'pointer', minWidth:'72px' },
+  quickPayLabel:{ fontSize:'11px', fontWeight:'700', color:'#1e293b' },
+
+  divRow:     { display:'flex', alignItems:'center', gap:'10px', margin:'4px 0 16px 0' },
   divLine:    { flex:1, height:'1px', background:'#e2e8f0' },
   divTxt:     { fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap' },
-  upiRow:     { display:'flex', alignItems:'center', gap:'10px', background:'#f8fafc', padding:'12px 14px', borderRadius:'14px', marginBottom:'10px', textAlign:'left' },
-  upiText:    { fontSize:'13px', fontWeight:'700', color:'#1e293b', flex:1 },
-  copyBtn:    { padding:'7px 12px', borderRadius:'10px', border:'none', fontSize:'12px', fontWeight:'700', cursor:'pointer', flexShrink:0 },
-  tipBox:     { background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'12px', padding:'12px 14px', textAlign:'left', marginBottom:'4px' },
-  doneBtn:    { width:'100%', padding:'14px', background:'#1e293b', color:'#fff', border:'none', borderRadius:'14px', fontWeight:'800', cursor:'pointer', fontSize:'15px', marginTop:'16px' },
+
+  qrBox:      { display:'flex', justifyContent:'center', background:'#f8fafc',
+                borderRadius:'16px', padding:'16px', marginBottom:'14px' },
+  qrImg:      { width:'200px', height:'200px', borderRadius:'8px', display:'block' },
+
+  amountChip: { display:'inline-block', background:'#ede9fe', color:'#4f46e5',
+                padding:'7px 20px', borderRadius:'20px', fontSize:'14px',
+                fontWeight:'800', marginBottom:'14px' },
+
+  upiRow:     { display:'flex', alignItems:'center', gap:'10px', background:'#f8fafc',
+                padding:'12px 14px', borderRadius:'14px', marginBottom:'10px', textAlign:'left' },
+  upiTxt:     { fontSize:'13px', fontWeight:'700', color:'#1e293b', flex:1 },
+  copyBtn:    { padding:'7px 12px', borderRadius:'10px', border:'none', fontSize:'12px',
+                fontWeight:'700', cursor:'pointer', flexShrink:0,
+                display:'flex', alignItems:'center', gap:'4px' },
+  doneBtn:    { width:'100%', padding:'14px', background:'#1e293b', color:'#fff',
+                border:'none', borderRadius:'14px', fontWeight:'800',
+                cursor:'pointer', fontSize:'15px', marginTop:'14px' },
+
+  /* footer */
+  footer:       { textAlign:'center', marginTop:'20px', paddingBottom:'20px' },
+  footerDivider:{ height:'1px', background:'linear-gradient(90deg,transparent,#e2e8f0,transparent)', marginBottom:'20px' },
+  footerBrand:  { margin:'0 0 4px 0', fontWeight:'800', fontSize:'14px', color:'#1e293b' },
+  footerDev:    { margin:'0 0 16px 0', fontSize:'12px', color:'#64748b' },
+  footerLinks:  { display:'flex', justifyContent:'center', gap:'10px', marginBottom:'16px' },
+  footerLink:   { padding:'12px', background:'#fff', borderRadius:'12px',
+                  color:'#1e293b', display:'flex', textDecoration:'none',
+                  boxShadow:'0 2px 8px rgba(0,0,0,0.06)' },
+  footerMeta:   { display:'flex', alignItems:'center', justifyContent:'space-between',
+                  fontSize:'10px', color:'#94a3b8', padding:'0 4px' },
+  dot:          { width:'6px', height:'6px', background:'#22c55e', borderRadius:'50%' },
 };
 
 export default StudentPortal;
