@@ -123,8 +123,21 @@ const StudentPortal = () => {
   const amount    = data?.student?.totalDue || 0;
   const upiString = `upi://pay?pa=${upiId}&pn=Didi%20Mess&am=${amount}&cu=INR`;
   const qrUrl     = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiString)}`;
-  const gpayUrl   = `intent://pay?pa=${upiId}&pn=Didi%20Mess&am=${amount}&cu=INR#Intent;package=com.google.android.apps.nbu.paisa.user;scheme=upi;end`;
-  const phonepeUrl= `phonepe://pay?pa=${upiId}&pn=Didi%20Mess&am=${amount}&cu=INR`;
+
+  /* ── Due date: joiningDate ka same day, next month ── */
+  const calcDueDate = (joiningDate) => {
+    if (!joiningDate) return 'N/A';
+    const joined = new Date(joiningDate);
+    const day    = joined.getDate(); // e.g. 12
+    const now    = new Date();
+    // next month same day
+    let dueMonth = now.getMonth() + 1; // next month (0-indexed)
+    let dueYear  = now.getFullYear();
+    if (dueMonth > 11) { dueMonth = 0; dueYear += 1; }
+    const due = new Date(dueYear, dueMonth, day);
+    return due.toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' });
+  };
+  const dueDateStr = calcDueDate(data?.student?.joiningDate);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(upiId).then(() => {
@@ -155,7 +168,7 @@ const StudentPortal = () => {
     <div style={S.loginWrap}>
       <div style={S.loginCard}>
         <div style={S.loginLogo}><ShieldCheck size={28} color="#4F46E5"/></div>
-        <h2 style={S.loginTitle}>Didi Mess</h2>
+        <h2 style={S.loginTitle}>Apna mess</h2>
         <p style={S.loginSub}>Student Portal · Secure Access</p>
 
         <input
@@ -212,36 +225,7 @@ const StudentPortal = () => {
             <h3 style={S.modalTitle}>Pay ₹{amount}</h3>
             <p style={S.modalSub}>Didi Mess · UPI</p>
 
-            {/* Quick UPI App buttons */}
-            <div style={S.quickPayRow}>
-              <button type="button" style={S.quickPayBtn}
-                onClick={() => window.open(gpayUrl, '_blank')}>
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Google_Pay_Logo.svg/120px-Google_Pay_Logo.svg.png"
-                  alt="GPay" style={{ width:28, height:28, objectFit:'contain' }}/>
-                <span style={S.quickPayLabel}>GPay</span>
-              </button>
-
-              <button type="button" style={S.quickPayBtn}
-                onClick={() => window.open(phonepeUrl, '_blank')}>
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/PhonePe_Logo.svg/120px-PhonePe_Logo.svg.png"
-                  alt="PhonePe" style={{ width:28, height:28, objectFit:'contain' }}/>
-                <span style={S.quickPayLabel}>PhonePe</span>
-              </button>
-
-              <button type="button" style={S.quickPayBtn}
-                onClick={() => window.open(upiString, '_blank')}>
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/120px-UPI-Logo-vector.svg.png"
-                  alt="UPI" style={{ width:28, height:28, objectFit:'contain' }}/>
-                <span style={S.quickPayLabel}>Any UPI</span>
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div style={S.divRow}>
-              <div style={S.divLine}/><span style={S.divTxt}>or scan QR code</span><div style={S.divLine}/>
-            </div>
-
-            {/* QR */}
+            {/* QR Code */}
             <div style={S.qrBox}>
               <img src={qrUrl} alt="QR" style={S.qrImg}/>
             </div>
@@ -290,7 +274,7 @@ const StudentPortal = () => {
       {/* ── Due Alert ── */}
       <div style={S.dueAlert}>
         <AlertCircle size={14} color="#b45309"/>
-        <span style={{ fontSize:'12px', color:'#92400e', fontWeight:'600' }}>Payment due: 1st June 2025</span>
+        <span style={{ fontSize:'12px', color:'#92400e', fontWeight:'600' }}>Payment due: {dueDateStr}</span>
         <button type="button" onClick={() => setShowPayModal(true)} style={S.duePayBtn}>Pay Now</button>
       </div>
 
@@ -536,7 +520,7 @@ const StudentPortal = () => {
       {/* ── Footer ── */}
       <footer style={S.footer}>
         <div style={S.footerDivider}/>
-        <p style={S.footerBrand}>Didi Mess Solutions</p>
+        <p style={S.footerBrand}>Apna mess</p>
         <p style={S.footerDev}>Developed by <strong>Jivan Karsh</strong></p>
         <div style={S.footerLinks}>
           <a href="tel:6267216334"            style={S.footerLink} title="Call us"><PhoneCall size={16}/></a>
