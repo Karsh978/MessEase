@@ -28,7 +28,7 @@ const Attendance = () => {
   const [filterMeal,  setFilterMeal]  = useState('all');
   const [showFilter,  setShowFilter]  = useState(false);
   const [bulkLoading, setBulkLoading] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+ const [processingIds, setProcessingIds] = useState(new Set());
   const searchRef = useRef(null);
 
   useEffect(() => { loadData(); }, [date]);
@@ -51,13 +51,17 @@ const Attendance = () => {
   };
 
   const toggleMeal = async (studentId, mealType) => {
-    if (isProcessing) return; // Agar pehle se kaam chal raha hai toh ruk jao
-    
-    setIsProcessing(true); // Kaam shuru
+    // Agar ye student pehle se update ho raha hai toh click rok do
+    const processKey = `${studentId}-${mealType}`;
+    if (processingIds.has(processKey)) return;
+
+    // Student ko processing list mein daalo
+    setProcessingIds(prev => new Set(prev).add(processKey));
+
     const price = mealType === 'breakfast' ? 25 : 50;
     const isRemoving = statusMap[studentId]?.[mealType];
 
-    // Optimistic UI Update (Turant dikhao)
+    // 1. UI turant update karo (Optimistic)
     setStatusMap(prev => ({
       ...prev,
       [studentId]: { ...prev[studentId], [mealType]: !prev[studentId]?.[mealType] }
@@ -68,12 +72,25 @@ const Attendance = () => {
     ));
 
     try {
-      await toggleMealAttendance({ studentId, date, mealType });
+      // 2. Backend ko bhejo
+      const res = await toggleMealAttendance({ studentId, date, mealType });
+      
+      // 3. Backend se aaye asli total se sync karo (Zaroori)
+      if (res.data && res.data.totalDue !== undefined) {
+          setStudents(prev => prev.map(s => 
+            s._id === studentId ? { ...s, totalDue: res.data.totalDue } : s
+          ));
+      }
     } catch (err) {
-      loadData(); // Error ho toh data reload kar lo
+      console.error("Update fail");
+      loadData(); // Error aane par poora data refresh kar lo
     } finally {
-      // 500ms baad hi agla click allow karein
-      setTimeout(() => setIsProcessing(false), 500); 
+      // 4. Processing khatam, lock hatao
+      setProcessingIds(prev => {
+        const next = new Set(prev);
+        next.delete(processKey);
+        return next;
+      });
     }
 };
 

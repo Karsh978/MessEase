@@ -137,38 +137,41 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
     const rates = { breakfast: 25, lunch: 50, dinner: 50 };
     const amount = rates[mealType];
 
+    // 1. Attendance record dhoondo
     let record = await Attendance.findOne({ studentId, date });
     if (!record) record = new Attendance({ studentId, date });
 
     const student = await Student.findById(studentId);
     if (!student) return res.status(404).json({ msg: "Student not found" });
 
+    // 2. Logic: Agar pehle se laga hai toh hatao (-), nahi toh lagao (+)
     if (record[mealType]) {
-      // Attendance Hata rahe hain (Minus)
+      // UNCHECK ho raha hai
       record[mealType] = false;
-      // Atomic Update: Database mein direct minus karo
+      // Database ko bolo: "Jo bhi balance hai usme se amount kam kar do"
       await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: -amount } });
     } else {
-      // Attendance Laga rahe hain (Plus)
+      // CHECK ho raha hai
       record[mealType] = true;
-      // Atomic Update: Database mein direct plus karo
+      // Database ko bolo: "Jo bhi balance hai usme amount add kar do"
       await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: amount } });
     }
 
     await record.save();
-    
-    // Final bill check (Safety ke liye ki zero se niche na jaye)
-    const updatedStudent = await Student.findById(studentId);
-    if (updatedStudent.totalDue < 0) {
-        updatedStudent.totalDue = 0;
-        await updatedStudent.save();
+
+    // 3. Safety Check: Bill kabhi minus mein na dikhe
+    const finalStudent = await Student.findById(studentId);
+    if (finalStudent.totalDue < 0) {
+      finalStudent.totalDue = 0;
+      await finalStudent.save();
     }
 
-    res.json({ msg: "Success", record, totalDue: updatedStudent.totalDue });
+    res.json({ msg: "Success", record, totalDue: finalStudent.totalDue });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // 3. ATTENDANCE STATUS CHECK
 app.get('/api/attendance/status/:date', async (req, res) => {
