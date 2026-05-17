@@ -135,8 +135,7 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
   try {
     const { studentId, date, mealType } = req.body;
     const rates = { breakfast: 25, lunch: 50, dinner: 50 };
-
-    if (!studentId || !date || !mealType) return res.status(400).json({ msg: "Missing data" });
+    const amount = rates[mealType];
 
     let record = await Attendance.findOne({ studentId, date });
     if (!record) record = new Attendance({ studentId, date });
@@ -145,16 +144,27 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
     if (!student) return res.status(404).json({ msg: "Student not found" });
 
     if (record[mealType]) {
+      // Attendance Hata rahe hain (Minus)
       record[mealType] = false;
-      student.totalDue = Math.max(0, (student.totalDue || 0) - rates[mealType]);
+      // Atomic Update: Database mein direct minus karo
+      await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: -amount } });
     } else {
+      // Attendance Laga rahe hain (Plus)
       record[mealType] = true;
-      student.totalDue = (student.totalDue || 0) + rates[mealType];
+      // Atomic Update: Database mein direct plus karo
+      await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: amount } });
     }
 
     await record.save();
-    await student.save();
-    res.json({ msg: "Success", record, totalDue: student.totalDue });
+    
+    // Final bill check (Safety ke liye ki zero se niche na jaye)
+    const updatedStudent = await Student.findById(studentId);
+    if (updatedStudent.totalDue < 0) {
+        updatedStudent.totalDue = 0;
+        await updatedStudent.save();
+    }
+
+    res.json({ msg: "Success", record, totalDue: updatedStudent.totalDue });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

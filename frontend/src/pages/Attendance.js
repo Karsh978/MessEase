@@ -28,6 +28,7 @@ const Attendance = () => {
   const [filterMeal,  setFilterMeal]  = useState('all');
   const [showFilter,  setShowFilter]  = useState(false);
   const [bulkLoading, setBulkLoading] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const searchRef = useRef(null);
 
   useEffect(() => { loadData(); }, [date]);
@@ -50,18 +51,31 @@ const Attendance = () => {
   };
 
   const toggleMeal = async (studentId, mealType) => {
-    const price    = mealType === 'breakfast' ? 25 : 50;
-    const removing = !!statusMap[studentId]?.[mealType];
-    setStatusMap(p => ({ ...p, [studentId]: { ...p[studentId], [mealType]: !p[studentId]?.[mealType] } }));
-    setStudents(p => p.map(s => s._id === studentId
-      ? { ...s, totalDue: Math.max(0, s.totalDue + (removing ? -price : price)) } : s));
+    if (isProcessing) return; // Agar pehle se kaam chal raha hai toh ruk jao
+    
+    setIsProcessing(true); // Kaam shuru
+    const price = mealType === 'breakfast' ? 25 : 50;
+    const isRemoving = statusMap[studentId]?.[mealType];
+
+    // Optimistic UI Update (Turant dikhao)
+    setStatusMap(prev => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], [mealType]: !prev[studentId]?.[mealType] }
+    }));
+
+    setStudents(prev => prev.map(s => 
+      s._id === studentId ? { ...s, totalDue: Math.max(0, isRemoving ? s.totalDue - price : s.totalDue + price) } : s
+    ));
+
     try {
       await toggleMealAttendance({ studentId, date, mealType });
-    } catch {
-      loadData();
-      flash('❌ Update nahi hua, dobara try karo', false);
+    } catch (err) {
+      loadData(); // Error ho toh data reload kar lo
+    } finally {
+      // 500ms baad hi agla click allow karein
+      setTimeout(() => setIsProcessing(false), 500); 
     }
-  };
+};
 
   const markAll = async (mealType) => {
     setBulkLoading(mealType);
