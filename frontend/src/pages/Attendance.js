@@ -29,6 +29,7 @@ const Attendance = () => {
   const [showFilter,  setShowFilter]  = useState(false);
   const [bulkLoading, setBulkLoading] = useState('');
  const [processingIds, setProcessingIds] = useState(new Set());
+ const [isUpdating, setIsUpdating] = useState(false);
   const searchRef = useRef(null);
 
   useEffect(() => { loadData(); }, [date]);
@@ -50,14 +51,10 @@ const Attendance = () => {
     setTimeout(() => setMessage({ text:'', ok:true }), 3000);
   };
 
-  const toggleMeal = async (studentId, mealType) => {
-    // Agar ye student pehle se update ho raha hai toh click rok do
-    const processKey = `${studentId}-${mealType}`;
-    if (processingIds.has(processKey)) return;
+ const toggleMeal = async (studentId, mealType) => {
+    if (isUpdating) return; // Agar pehle se update ho raha hai toh ruk jao
 
-    // Student ko processing list mein daalo
-    setProcessingIds(prev => new Set(prev).add(processKey));
-
+    setIsUpdating(true);
     const price = mealType === 'breakfast' ? 25 : 50;
     const isRemoving = statusMap[studentId]?.[mealType];
 
@@ -72,25 +69,20 @@ const Attendance = () => {
     ));
 
     try {
-      // 2. Backend ko bhejo
+      // 2. Backend ko bhej kar asli total wapas lo
       const res = await toggleMealAttendance({ studentId, date, mealType });
       
-      // 3. Backend se aaye asli total se sync karo (Zaroori)
+      // 3. Backend se jo asli totalDue aaya hai, usey set karo (V. Important)
       if (res.data && res.data.totalDue !== undefined) {
-          setStudents(prev => prev.map(s => 
-            s._id === studentId ? { ...s, totalDue: res.data.totalDue } : s
-          ));
+        setStudents(prev => prev.map(s => 
+          s._id === studentId ? { ...s, totalDue: res.data.totalDue } : s
+        ));
       }
     } catch (err) {
       console.error("Update fail");
-      loadData(); // Error aane par poora data refresh kar lo
+      loadData(); // Error ho toh refresh kar lo
     } finally {
-      // 4. Processing khatam, lock hatao
-      setProcessingIds(prev => {
-        const next = new Set(prev);
-        next.delete(processKey);
-        return next;
-      });
+      setIsUpdating(false); // Lock hatao
     }
 };
 

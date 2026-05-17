@@ -130,44 +130,45 @@ app.post('/api/students/portal-login', async (req, res) => {
   }
 });
 
+// server.js mein toggle-meal route ko isse replace karein
 app.post('/api/attendance/toggle-meal', async (req, res) => {
   try {
     const { studentId, date, mealType } = req.body;
     const rates = { breakfast: 25, lunch: 50, dinner: 50 };
     const amount = rates[mealType];
 
-    // 1. Pehle check karo ki kya us student aur date ka record pehle se hai?
+    // 1. Attendance record dhoondo ya naya banao
     let record = await Attendance.findOne({ studentId, date });
-
     if (!record) {
-      // Agar record nahi hai, toh naya banao
-      record = new Attendance({ studentId, date, [mealType]: true });
-      await record.save();
-      // Bill badhao
-      await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: amount } });
-    } else {
-      // Agar record mil gaya, toh check karo ki wo meal pehle se laga hai ya nahi
-      const isMarked = record[mealType];
-
-      if (isMarked) {
-        // Agar pehle se laga hai, toh hatao (false) aur bill kam karo
-        await Attendance.findOneAndUpdate({ studentId, date }, { $set: { [mealType]: false } });
-        await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: -amount } });
-      } else {
-        // Agar nahi laga hai, toh lagao (true) aur bill badhao
-        await Attendance.findOneAndUpdate({ studentId, date }, { $set: { [mealType]: true } });
-        await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: amount } });
-      }
+        record = new Attendance({ studentId, date });
     }
 
-    // 2. Safety Check: Bill zero se niche na jaye
-    const updatedStudent = await Student.findById(studentId);
+    // 2. Check karo ki meal pehle se laga hai ya nahi
+    const isAlreadyMarked = record[mealType];
+    const newStatus = !isAlreadyMarked;
+    const billChange = newStatus ? amount : -amount;
+
+    // 3. ATOMIC UPDATE: Attendance aur Student Bill dono ko ek saath sahi karo
+    // Pehle Attendance update karo
+    await Attendance.findOneAndUpdate(
+        { studentId, date },
+        { $set: { [mealType]: newStatus } },
+        { upsert: true, new: true }
+    );
+
+    // Fir Student ka bill update karo ($inc use karke taaki calculation fail na ho)
+    const updatedStudent = await Student.findByIdAndUpdate(
+        studentId,
+        { $inc: { totalDue: billChange } },
+        { new: true }
+    );
+
+    // 4. Safety Check: Bill zero se niche na jaye
     if (updatedStudent.totalDue < 0) {
-      updatedStudent.totalDue = 0;
-      await updatedStudent.save();
+        updatedStudent.totalDue = 0;
+        await updatedStudent.save();
     }
 
-    // 3. Updated record wapas bhejo taaki UI refresh ho jaye
     const finalRecord = await Attendance.findOne({ studentId, date });
     res.json({ msg: "Success", record: finalRecord, totalDue: updatedStudent.totalDue });
 
@@ -176,7 +177,6 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // 3. ATTENDANCE STATUS CHECK
 app.get('/api/attendance/status/:date', async (req, res) => {
