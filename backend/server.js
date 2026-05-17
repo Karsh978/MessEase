@@ -130,44 +130,49 @@ app.post('/api/students/portal-login', async (req, res) => {
   }
 });
 
-// 2. 3-MEAL ATTENDANCE TOGGLE
 app.post('/api/attendance/toggle-meal', async (req, res) => {
   try {
     const { studentId, date, mealType } = req.body;
     const rates = { breakfast: 25, lunch: 50, dinner: 50 };
     const amount = rates[mealType];
 
-    // 1. Attendance record dhoondo
+    // 1. Pehle check karo ki kya us student aur date ka record pehle se hai?
     let record = await Attendance.findOne({ studentId, date });
-    if (!record) record = new Attendance({ studentId, date });
 
-    const student = await Student.findById(studentId);
-    if (!student) return res.status(404).json({ msg: "Student not found" });
-
-    // 2. Logic: Agar pehle se laga hai toh hatao (-), nahi toh lagao (+)
-    if (record[mealType]) {
-      // UNCHECK ho raha hai
-      record[mealType] = false;
-      // Database ko bolo: "Jo bhi balance hai usme se amount kam kar do"
-      await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: -amount } });
-    } else {
-      // CHECK ho raha hai
-      record[mealType] = true;
-      // Database ko bolo: "Jo bhi balance hai usme amount add kar do"
+    if (!record) {
+      // Agar record nahi hai, toh naya banao
+      record = new Attendance({ studentId, date, [mealType]: true });
+      await record.save();
+      // Bill badhao
       await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: amount } });
+    } else {
+      // Agar record mil gaya, toh check karo ki wo meal pehle se laga hai ya nahi
+      const isMarked = record[mealType];
+
+      if (isMarked) {
+        // Agar pehle se laga hai, toh hatao (false) aur bill kam karo
+        await Attendance.findOneAndUpdate({ studentId, date }, { $set: { [mealType]: false } });
+        await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: -amount } });
+      } else {
+        // Agar nahi laga hai, toh lagao (true) aur bill badhao
+        await Attendance.findOneAndUpdate({ studentId, date }, { $set: { [mealType]: true } });
+        await Student.findByIdAndUpdate(studentId, { $inc: { totalDue: amount } });
+      }
     }
 
-    await record.save();
-
-    // 3. Safety Check: Bill kabhi minus mein na dikhe
-    const finalStudent = await Student.findById(studentId);
-    if (finalStudent.totalDue < 0) {
-      finalStudent.totalDue = 0;
-      await finalStudent.save();
+    // 2. Safety Check: Bill zero se niche na jaye
+    const updatedStudent = await Student.findById(studentId);
+    if (updatedStudent.totalDue < 0) {
+      updatedStudent.totalDue = 0;
+      await updatedStudent.save();
     }
 
-    res.json({ msg: "Success", record, totalDue: finalStudent.totalDue });
+    // 3. Updated record wapas bhejo taaki UI refresh ho jaye
+    const finalRecord = await Attendance.findOne({ studentId, date });
+    res.json({ msg: "Success", record: finalRecord, totalDue: updatedStudent.totalDue });
+
   } catch (err) {
+    console.error("Toggle Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
