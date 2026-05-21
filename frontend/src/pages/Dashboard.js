@@ -182,10 +182,29 @@ const Dashboard = () => {
   };
 
   const sendWelcomeMessage = (student) => {
-    const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`;
-    const msg = `Namaste ${student.name}!\nDidi's Mess mein aapka swagat hai.\n\nAb se aap apni roz ki attendance aur bill niche diye gaye link par live dekh sakte hain:\nLink: ${portalURL}\n\nLogin ID: ${student.phone}\nAapka PIN: ${student.password || '1234'}\n\nKripya is link ko save kar lein. Dhanyawad!`;
+    // 1. Aapka Portal Link (ID ke saath)
+    const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`; 
+    
+    // 2. Aapka WhatsApp Group Link
+    const groupLink = "https://chat.whatsapp.com/J5TdPYwLKjJ5IAHtyJB0y6"; 
+
+    const msg = `Namaste ${student.name}! 🙏
+Didi's Mess mein aapka swagat hai. 🍱
+
+Ab se aap apni roz ki attendance aur bill niche diye gaye link par click karke LIVE dekh sakte hain:
+🔗 Link: ${portalURL}
+
+📱 Login ID: ${student.phone}
+🔑 PIN: ${student.password || '1234'}
+
+⚠️ Zaroori updates aur chutti ki jankari ke liye hamara WhatsApp Group zaroor join karein:
+📢 Group Link: ${groupLink}
+
+Kripya is link ko save kar lein. Dhanyawad! ✨`;
+
+    // WhatsApp par message bhejne ke liye
     window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
-  };
+};
 
   const handleEmailReminder = async (student) => {
     if (!student.email) return alert("email not found!");

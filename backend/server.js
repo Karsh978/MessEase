@@ -76,6 +76,17 @@ app.use('/api/menu/update', authAdmin);
 // 1. Token Save Route
 // server.js mein yahan paste karein:
 
+
+// 1. Root Route (Browser mein check karne ke liye)
+app.get('/', (req, res) => {
+    res.send("Didi's Mess Server is Running... 🚀");
+});
+
+// 2. Health Check Route (UptimeRobot ke liye)
+app.get('/api/health', (req, res) => {
+    res.status(200).send("I am awake!");
+});
+
 app.get('/api/admin/test-get', (req, res) => {
     res.json({ msg: "Notification system is ONLINE!" });
 });
