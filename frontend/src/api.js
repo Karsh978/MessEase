@@ -24,6 +24,7 @@ export const fetchBillSummary = (id) => API.get(`/students/bill-summary/${id}`);
 
 export const fetchAttendanceStatus = (date) => API.get(`/attendance/status/${date}`);
 export const loginStudent = (data) => API.post('/students/portal-login', data);
+export const fetchStudentData = (id) => API.get(`/students/${id}`);
 
 // api.js mein check karo:
 export const deleteStudent = (id) => API.delete(`/students/${id}`); // Backticks (`) zaroori hain!
