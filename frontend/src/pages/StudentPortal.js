@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { loginStudent, fetchMenu, updateStudentProfile } from '../api';
+import React, { useState, useEffect, useRef } from 'react';
+import { loginStudent, fetchMenu, updateStudentProfile, fetchStudentData } from '../api';
 import {
   Utensils, Mail, Camera, LogOut, CreditCard, Smartphone,
   ShieldCheck, PhoneCall, ExternalLink, PieChart, History,
@@ -44,9 +44,44 @@ const StudentPortal = () => {
   const [notification,setNotification]= useState(null);
   const [editForm,    setEditForm]    = useState({ address:'', emergencyContact:'', profilePic:'', email:'' });
 
+  // Ref to hold latest data for refresh without stale closure issues
+  const dataRef = useRef(null);
+  const refreshIntervalRef = useRef(null);
+
   const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const todayName = DAYS[new Date().getDay()];
   const todayDate = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+  /* ── Background refresh: pull latest attendance + data every 30s ── */
+  const startAutoRefresh = (studentId, token) => {
+    // Clear any existing interval first
+    if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+
+    refreshIntervalRef.current = setInterval(async () => {
+      try {
+        // fetchStudentData fetches fresh student + attendance from server
+        // If your API has a different endpoint, adjust accordingly
+        const res = await fetchStudentData(studentId, token);
+        if (res?.data) {
+          const current = dataRef.current;
+          const merged = { ...current, ...res.data };
+          dataRef.current = merged;
+          localStorage.setItem('studentPortalData', JSON.stringify(merged));
+          setData({ ...merged }); // force re-render
+        }
+      } catch (e) {
+        // Silent fail — don't disrupt UX on background refresh error
+        console.warn('Background refresh failed:', e);
+      }
+    }, 30000); // every 30 seconds
+  };
+
+  /* cleanup on unmount */
+  useEffect(() => {
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+    };
+  }, []);
 
   /* load saved session */
   useEffect(() => {
@@ -54,6 +89,7 @@ const StudentPortal = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        dataRef.current = parsed;
         setData(parsed);
         setEditForm({
           address:          parsed.student?.address          || '',
@@ -67,6 +103,10 @@ const StudentPortal = () => {
             setMenu(menuRes.data.find(m => m.day === todayName));
           } catch (e) { console.error(e); }
         })();
+        // Start background refresh using saved session token
+        if (parsed.student?._id && parsed.token) {
+          startAutoRefresh(parsed.student._id, parsed.token);
+        }
       } catch { localStorage.removeItem('studentPortalData'); }
     }
   }, [todayName]);
@@ -77,6 +117,7 @@ const StudentPortal = () => {
     setIsLoading(true); setError('');
     try {
       const res = await loginStudent({ phone, password });
+      dataRef.current = res.data;
       localStorage.setItem('studentPortalData', JSON.stringify(res.data));
       setData(res.data);
       setEditForm({
@@ -87,6 +128,10 @@ const StudentPortal = () => {
       });
       const menuRes = await fetchMenu();
       setMenu(menuRes.data.find(m => m.day === todayName));
+      // Start background refresh after fresh login
+      if (res.data.student?._id && res.data.token) {
+        startAutoRefresh(res.data.student._id, res.data.token);
+      }
     } catch (err) {
       setError(err.response?.data?.msg || 'Login failed! Please check credentials.');
     } finally { setIsLoading(false); }
@@ -95,7 +140,9 @@ const StudentPortal = () => {
   /* logout */
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
       localStorage.removeItem('studentPortalData');
+      dataRef.current = null;
       setData(null);
     }
   };
@@ -105,6 +152,7 @@ const StudentPortal = () => {
     try {
       await updateStudentProfile(data.student._id, editForm);
       const updated = { ...data, student: { ...data.student, ...editForm } };
+      dataRef.current = updated;
       localStorage.setItem('studentPortalData', JSON.stringify(updated));
       setData(updated);
       setIsEditing(false);
@@ -128,10 +176,9 @@ const StudentPortal = () => {
   const calcDueDate = (joiningDate) => {
     if (!joiningDate) return 'N/A';
     const joined = new Date(joiningDate);
-    const day    = joined.getDate(); // e.g. 12
+    const day    = joined.getDate();
     const now    = new Date();
-    // next month same day
-    let dueMonth = now.getMonth() + 1; // next month (0-indexed)
+    let dueMonth = now.getMonth() + 1;
     let dueYear  = now.getFullYear();
     if (dueMonth > 11) { dueMonth = 0; dueYear += 1; }
     const due = new Date(dueYear, dueMonth, day);
@@ -152,6 +199,7 @@ const StudentPortal = () => {
 
   /* ── attendance stats ──────────────────────────────────── */
   const attendanceList = data?.attendance || [];
+
   const thisMonthMeals = attendanceList.filter(h => {
     const d = new Date(h.date);
     const now = new Date();
@@ -159,6 +207,48 @@ const StudentPortal = () => {
   });
 
   const mealCount = (list, type) => list.filter(h => h[type]).length;
+
+  /* ── Build full day-wise calendar for current month ──────── */
+  const buildMonthCalendar = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const today = now.getDate();
+
+    // joiningDate: only show days from joining onwards if same month/year
+    const joining = data?.student?.joiningDate ? new Date(data.student.joiningDate) : null;
+
+    // Map attendance by date string "YYYY-MM-DD"
+    const attendMap = {};
+    attendanceList.forEach(h => {
+      const d = new Date(h.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      attendMap[key] = h;
+    });
+
+    const days = [];
+    for (let day = 1; day <= today; day++) {
+      const date = new Date(year, month, day);
+      // Skip days before joining date if joined this month/year
+      if (joining) {
+        const joiningMidnight = new Date(joining.getFullYear(), joining.getMonth(), joining.getDate());
+        const dateMidnight    = new Date(year, month, day);
+        if (
+          joining.getFullYear() === year &&
+          joining.getMonth() === month &&
+          dateMidnight < joiningMidnight
+        ) continue;
+      }
+      const key = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const record = attendMap[key] || null;
+      const hasMeal = record && (record.breakfast || record.lunch || record.dinner);
+      days.push({ day, date, key, record, hasMeal });
+    }
+    return days;
+  };
+
+  const monthCalendar = buildMonthCalendar();
+  const missingDays   = monthCalendar.filter(d => !d.hasMeal);
 
   /* ─────────────────────────────────────────────────────────── */
   if (isLoading) return <GoogleLoader />;
@@ -420,9 +510,84 @@ const StudentPortal = () => {
             </div>
           </div>
 
+          {/* ── Day-wise Full History (present + missing) ── */}
           <div style={S.section}>
-            <p style={S.sectionTitle}>Full History</p>
-            <div style={{ maxHeight:'400px', overflowY:'auto' }}>
+            <p style={S.sectionTitle}>Day-wise History (This Month)</p>
+            <div style={{ maxHeight:'500px', overflowY:'auto' }}>
+              {monthCalendar.length > 0
+                ? [...monthCalendar].reverse().map((item, i) => {
+                    const { day, date, record, hasMeal } = item;
+                    const dateStr = date.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+                    const dayName = DAYS[date.getDay()];
+
+                    if (!hasMeal) {
+                      /* ── Missing Day ── */
+                      return (
+                        <div key={i} style={S.histItemMissing}>
+                          <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                            <div style={S.missingIcon}>✕</div>
+                            <div>
+                              <div style={{ fontWeight:'600', fontSize:'13px', color:'#dc2626' }}>
+                                {dateStr}
+                              </div>
+                              <div style={{ fontSize:'11px', color:'#fca5a5', marginTop:'2px' }}>
+                                {dayName} · No meals recorded
+                              </div>
+                            </div>
+                          </div>
+                          <span style={S.missingBadge}>Missing</span>
+                        </div>
+                      );
+                    }
+
+                    /* ── Present Day ── */
+                    return (
+                      <div key={i} style={S.histItem}>
+                        <div>
+                          <div style={{ fontWeight:'600', fontSize:'13px', color:'#1e293b' }}>
+                            {dateStr}
+                          </div>
+                          <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' }}>
+                            {dayName} · {[record?.breakfast && 'Breakfast', record?.lunch && 'Lunch', record?.dinner && 'Dinner']
+                              .filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                        <div style={{ display:'flex', gap:'5px' }}>
+                          {record?.breakfast && <span style={S.mealTag('#fef3c7','#d97706')}>B</span>}
+                          {record?.lunch     && <span style={S.mealTag('#dcfce7','#16a34a')}>L</span>}
+                          {record?.dinner    && <span style={S.mealTag('#e0e7ff','#4f46e5')}>D</span>}
+                        </div>
+                      </div>
+                    );
+                  })
+                : <div style={S.emptyState}>No records yet for this month.</div>
+              }
+            </div>
+          </div>
+
+          {/* ── Missing Days Summary ── */}
+          {missingDays.length > 0 && (
+            <div style={S.missingSummaryBox}>
+              <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }}>
+                <AlertCircle size={14} color="#dc2626"/>
+                <span style={{ fontSize:'13px', fontWeight:'700', color:'#dc2626' }}>
+                  {missingDays.length} Missing Day{missingDays.length > 1 ? 's' : ''} This Month
+                </span>
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:'6px' }}>
+                {missingDays.map((d,i) => (
+                  <span key={i} style={S.missingDayChip}>
+                    {d.date.toLocaleDateString('en-GB',{ day:'2-digit', month:'short' })}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Full Attendance History (all months) ── */}
+          <div style={S.section}>
+            <p style={S.sectionTitle}>All Records</p>
+            <div style={{ maxHeight:'300px', overflowY:'auto' }}>
               {attendanceList.length > 0
                 ? attendanceList.map((h,i) => (
                   <div key={i} style={S.histItem}>
@@ -645,12 +810,29 @@ const S = {
   /* section */
   section:  { marginBottom:'16px' },
   sectionHead:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' },
-  sectionTitle:{ fontSize:'14px', fontWeight:'700', color:'#475569' },
+  sectionTitle:{ fontSize:'14px', fontWeight:'700', color:'#475569', marginBottom:'10px' },
   seeAll:   { display:'flex', alignItems:'center', gap:'2px', background:'none', border:'none',
                color:'#4f46e5', fontSize:'12px', fontWeight:'600', cursor:'pointer' },
   histItem: { display:'flex', justifyContent:'space-between', alignItems:'center',
                padding:'13px 14px', background:'#fff', borderRadius:'14px', marginBottom:'8px',
                border:'1px solid #f1f5f9' },
+
+  /* missing day styles */
+  histItemMissing: { display:'flex', justifyContent:'space-between', alignItems:'center',
+                      padding:'13px 14px', background:'#fff5f5', borderRadius:'14px', marginBottom:'8px',
+                      border:'1.5px solid #fecaca' },
+  missingIcon:     { width:'28px', height:'28px', background:'#fee2e2', borderRadius:'8px',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:'13px', fontWeight:'900', color:'#dc2626', flexShrink:0 },
+  missingBadge:    { background:'#fee2e2', color:'#dc2626', padding:'4px 10px',
+                      borderRadius:'8px', fontSize:'10px', fontWeight:'900' },
+
+  /* missing days summary box */
+  missingSummaryBox:{ background:'#fff5f5', border:'1.5px solid #fecaca', borderRadius:'16px',
+                       padding:'14px 16px', marginBottom:'16px' },
+  missingDayChip:  { background:'#fee2e2', color:'#dc2626', padding:'4px 10px',
+                      borderRadius:'8px', fontSize:'11px', fontWeight:'700' },
+
   mealTag:  (bg,color) => ({
     background:bg, color, padding:'3px 8px', borderRadius:'6px', fontSize:'10px', fontWeight:'900'
   }),
@@ -710,17 +892,6 @@ const S = {
                 cursor:'pointer', color:'#475569' },
   modalTitle: { margin:'0 0 4px 0', fontSize:'20px', color:'#1e293b', fontWeight:'800' },
   modalSub:   { margin:'0 0 18px 0', fontSize:'12px', color:'#64748b' },
-
-  /* quick pay */
-  quickPayRow:{ display:'flex', justifyContent:'center', gap:'12px', marginBottom:'16px' },
-  quickPayBtn:{ display:'flex', flexDirection:'column', alignItems:'center', gap:'6px',
-                background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:'16px',
-                padding:'12px 16px', cursor:'pointer', minWidth:'72px' },
-  quickPayLabel:{ fontSize:'11px', fontWeight:'700', color:'#1e293b' },
-
-  divRow:     { display:'flex', alignItems:'center', gap:'10px', margin:'4px 0 16px 0' },
-  divLine:    { flex:1, height:'1px', background:'#e2e8f0' },
-  divTxt:     { fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap' },
 
   qrBox:      { display:'flex', justifyContent:'center', background:'#f8fafc',
                 borderRadius:'16px', padding:'16px', marginBottom:'14px' },
