@@ -148,44 +148,39 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
     const rates = { breakfast: 25, lunch: 50, dinner: 50 };
     const amount = rates[mealType];
 
-    // 1. Attendance record dhoondo ya naya banao
-    let record = await Attendance.findOne({ studentId, date });
-    if (!record) {
-        record = new Attendance({ studentId, date });
-    }
-
-    // 2. Check karo ki meal pehle se laga hai ya nahi
-    const isAlreadyMarked = record[mealType];
+    // 1. Pehle Attendance record ko update karo (Strictly use findOneAndUpdate)
+    // Isse duplicate record banne ka khatra khatam ho jayega
+    const oldRecord = await Attendance.findOne({ studentId, date });
+    const isAlreadyMarked = oldRecord ? oldRecord[mealType] : false;
     const newStatus = !isAlreadyMarked;
-    const billChange = newStatus ? amount : -amount;
 
-    // 3. ATOMIC UPDATE: Attendance aur Student Bill dono ko ek saath sahi karo
-    // Pehle Attendance update karo
     await Attendance.findOneAndUpdate(
-        { studentId, date },
-        { $set: { [mealType]: newStatus } },
-        { upsert: true, new: true }
+      { studentId, date },
+      { $set: { [mealType]: newStatus } },
+      { upsert: true, new: true }
     );
 
-    // Fir Student ka bill update karo ($inc use karke taaki calculation fail na ho)
+    // 2. Student ka bill update karo ($inc is atomic)
+    // $inc use karne se koi farq nahi padta purana bill kya tha, ye hamesha sahi joddta hai
+    const billChange = newStatus ? amount : -amount;
+    
     const updatedStudent = await Student.findByIdAndUpdate(
-        studentId,
-        { $inc: { totalDue: billChange } },
-        { new: true }
+      studentId,
+      { $inc: { totalDue: billChange } },
+      { new: true }
     );
 
-    // 4. Safety Check: Bill zero se niche na jaye
-    if (updatedStudent.totalDue < 0) {
-        updatedStudent.totalDue = 0;
-        await updatedStudent.save();
+    // 3. ⚠️ Critical Fix for those 3-4 students: 
+    // Agar bill NaN ho gaya ho ya minus mein chala gaya ho, toh use 0 ya sahi value par reset karo
+    if (!updatedStudent.totalDue || updatedStudent.totalDue < 0) {
+      updatedStudent.totalDue = Math.max(0, updatedStudent.totalDue || 0);
+      await updatedStudent.save();
     }
 
-    const finalRecord = await Attendance.findOne({ studentId, date });
-    
-res.json({ msg: "Success", record: finalRecord });
+    res.json({ msg: "Success", record: { [mealType]: newStatus } });
 
   } catch (err) {
-    console.error("Toggle Error:", err.message);
+    console.error("Fatal Toggle Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });

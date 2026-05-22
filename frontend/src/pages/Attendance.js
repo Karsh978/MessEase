@@ -52,34 +52,34 @@ const Attendance = () => {
   };
 
  const toggleMeal = async (studentId, mealType) => {
-    // 1. Double click protection (Lock)
     const processKey = `${studentId}-${mealType}`;
     if (processingIds.has(processKey)) return;
     setProcessingIds(prev => new Set(prev).add(processKey));
 
     const price = mealType === 'breakfast' ? 25 : 50;
-    const isRemoving = statusMap[studentId]?.[mealType];
+    
+    // StatusMap se pucho ki abhi status kya hai
+    const isCurrentlyMarked = statusMap[studentId]?.[mealType] || false;
 
-    // 2. OPTIMISTIC UPDATE (Sirf local state badlo)
+    // 1. UI UPDATE (Optimistic)
     setStatusMap(prev => ({
       ...prev,
-      [studentId]: { ...prev[studentId], [mealType]: !prev[studentId]?.[mealType] }
+      [studentId]: { ...prev[studentId], [mealType]: !isCurrentlyMarked }
     }));
 
     setStudents(prev => prev.map(s => 
-      s._id === studentId ? { ...s, totalDue: Math.max(0, isRemoving ? s.totalDue - price : s.totalDue + price) } : s
+      s._id === studentId 
+        ? { ...s, totalDue: Math.max(0, isCurrentlyMarked ? s.totalDue - price : s.totalDue + price) } 
+        : s
     ));
 
     try {
-      // 3. Backend ko sirf inform karo
+      // 2. Backend Call
       await toggleMealAttendance({ studentId, date, mealType });
-      
-      // NOTE: Yahan res.data.totalDue ko set mat karna! 
-      // Isse race condition khatam ho jayegi.
-      
+      // Yahan res.data use mat karna, local calculation hi rehne do
     } catch (err) {
-      console.error("Update fail");
-      loadData(); // Sirf error aane par hi server se sync karo
+      alert("Network Error! Refreshing data...");
+      loadData(); // Sirf error par refresh karo
     } finally {
       setProcessingIds(prev => {
         const next = new Set(prev);
