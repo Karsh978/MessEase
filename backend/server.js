@@ -181,7 +181,8 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
     }
 
     const finalRecord = await Attendance.findOne({ studentId, date });
-    res.json({ msg: "Success", record: finalRecord, totalDue: updatedStudent.totalDue });
+    
+res.json({ msg: "Success", record: finalRecord });
 
   } catch (err) {
     console.error("Toggle Error:", err.message);

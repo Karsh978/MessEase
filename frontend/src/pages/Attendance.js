@@ -52,13 +52,15 @@ const Attendance = () => {
   };
 
  const toggleMeal = async (studentId, mealType) => {
-    if (isUpdating) return; // Agar pehle se update ho raha hai toh ruk jao
+    // 1. Double click protection (Lock)
+    const processKey = `${studentId}-${mealType}`;
+    if (processingIds.has(processKey)) return;
+    setProcessingIds(prev => new Set(prev).add(processKey));
 
-    setIsUpdating(true);
     const price = mealType === 'breakfast' ? 25 : 50;
     const isRemoving = statusMap[studentId]?.[mealType];
 
-    // 1. UI turant update karo (Optimistic)
+    // 2. OPTIMISTIC UPDATE (Sirf local state badlo)
     setStatusMap(prev => ({
       ...prev,
       [studentId]: { ...prev[studentId], [mealType]: !prev[studentId]?.[mealType] }
@@ -69,20 +71,21 @@ const Attendance = () => {
     ));
 
     try {
-      // 2. Backend ko bhej kar asli total wapas lo
-      const res = await toggleMealAttendance({ studentId, date, mealType });
+      // 3. Backend ko sirf inform karo
+      await toggleMealAttendance({ studentId, date, mealType });
       
-      // 3. Backend se jo asli totalDue aaya hai, usey set karo (V. Important)
-      if (res.data && res.data.totalDue !== undefined) {
-        setStudents(prev => prev.map(s => 
-          s._id === studentId ? { ...s, totalDue: res.data.totalDue } : s
-        ));
-      }
+      // NOTE: Yahan res.data.totalDue ko set mat karna! 
+      // Isse race condition khatam ho jayegi.
+      
     } catch (err) {
       console.error("Update fail");
-      loadData(); // Error ho toh refresh kar lo
+      loadData(); // Sirf error aane par hi server se sync karo
     } finally {
-      setIsUpdating(false); // Lock hatao
+      setProcessingIds(prev => {
+        const next = new Set(prev);
+        next.delete(processKey);
+        return next;
+      });
     }
 };
 
