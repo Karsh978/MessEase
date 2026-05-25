@@ -148,45 +148,39 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
     const rates = { breakfast: 25, lunch: 50, dinner: 50 };
     const amount = rates[mealType];
 
-    // 1. Attendance record dhoondo ya naya banao
-    let record = await Attendance.findOne({ studentId, date });
-    if (!record) {
-        record = new Attendance({ studentId, date });
-    }
+    // Models check
+    const Student = require('./models/Student');
+    const Attendance = require('./models/Attendance');
 
-    // 2. Check karo ki meal pehle se laga hai ya nahi
-    const isAlreadyMarked = record[mealType];
+    // 1. Attendance update
+    const record = await Attendance.findOne({ studentId, date });
+    const isAlreadyMarked = record ? record[mealType] : false;
     const newStatus = !isAlreadyMarked;
-    const billChange = newStatus ? amount : -amount;
 
-    // 3. ATOMIC UPDATE: Attendance aur Student Bill dono ko ek saath sahi karo
-    // Pehle Attendance update karo
     await Attendance.findOneAndUpdate(
-        { studentId, date },
-        { $set: { [mealType]: newStatus } },
-        { upsert: true, new: true }
+      { studentId, date },
+      { $set: { [mealType]: newStatus } },
+      { upsert: true, new: true }
     );
 
-    // Fir Student ka bill update karo ($inc use karke taaki calculation fail na ho)
+    // 2. Student Bill Update ($inc is atomic and safe)
+    const billChange = newStatus ? amount : -amount;
     const updatedStudent = await Student.findByIdAndUpdate(
-        studentId,
-        { $inc: { totalDue: billChange } },
-        { new: true }
+      studentId, 
+      { $inc: { totalDue: billChange } }, 
+      { new: true }
     );
 
-    // 4. Safety Check: Bill zero se niche na jaye
+    // 3. Safety: Negative bill reset
     if (updatedStudent.totalDue < 0) {
-        updatedStudent.totalDue = 0;
-        await updatedStudent.save();
+      updatedStudent.totalDue = 0;
+      await updatedStudent.save();
     }
 
-    const finalRecord = await Attendance.findOne({ studentId, date });
-    
-res.json({ msg: "Success", record: finalRecord });
-
+    res.json({ msg: "Success", newStatus });
   } catch (err) {
-    console.error("Toggle Error:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("Toggle Error:", err);
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
