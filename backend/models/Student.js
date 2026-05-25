@@ -13,6 +13,7 @@ const studentSchema = new mongoose.Schema({
       joiningDate: { type: Date, default: Date.now }, 
     joiningDate: { type: Date, default: Date.now },
     lastPaymentDate: { type: Date, default: Date.now } ,
+    cashCollected: { type: Number, default: 0 },
     fcmToken: String
 });
 

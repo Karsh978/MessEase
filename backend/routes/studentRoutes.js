@@ -30,10 +30,16 @@ router.get('/all', async (req, res) => {
 router.post('/pay/:id', async (req, res) => {
     try {
         const student = await Student.findById(req.params.id);
+        
+        // ✅ Jitna bill tha, utna cash collected mein add karo
+        const amountReceived = student.totalDue || 0;
+        
+        student.cashCollected = (student.cashCollected || 0) + amountReceived; // ← YEH NAYA HAI
         student.totalDue = 0; 
         student.lastPaymentDate = new Date(); 
         await student.save();
-        res.json({ msg: "Payment recorded, cycle reset!" });
+        
+        res.json({ msg: "Payment recorded!", amountReceived });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

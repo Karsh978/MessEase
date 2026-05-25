@@ -182,11 +182,8 @@ const Dashboard = () => {
   };
 
   const sendWelcomeMessage = (student) => {
-    // 1. Aapka Portal Link (ID ke saath)
-    const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`; 
-    
-    // 2. Aapka WhatsApp Group Link
-    const groupLink = "https://chat.whatsapp.com/J5TdPYwLKjJ5IAHtyJB0y6"; 
+    const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`;
+    const groupLink = "https://chat.whatsapp.com/J5TdPYwLKjJ5IAHtyJB0y6";
 
     const msg = `Namaste ${student.name}! 🙏
 Didi's Mess mein aapka swagat hai. 🍱
@@ -202,9 +199,8 @@ Ab se aap apni roz ki attendance aur bill niche diye gaye link par click karke L
 
 Kripya is link ko save kar lein. Dhanyawad! ✨`;
 
-    // WhatsApp par message bhejne ke liye
     window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
-};
+  };
 
   const handleEmailReminder = async (student) => {
     if (!student.email) return alert("email not found!");
@@ -249,7 +245,8 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
       doc.text(`Month: ${months[viewMonth]} ${viewYear}`, 15, 32);
       doc.text(`Total Udhari (Revenue): RS ${totalRevenue}`, 15, 42);
       doc.text(`Total Expenses: RS ${totalExp}`, 15, 52);
-      doc.text(`Net Profit: RS ${netProfit}`, 15, 62);
+      // ✅ UPDATED: Report mein Cash Profit dikhao
+      doc.text(`Cash Profit (Actual): RS ${actualProfit}`, 15, 62);
       doc.text(`Total Students: ${students.length}`, 15, 72);
       autoTable(doc, {
         startY: 82,
@@ -372,7 +369,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
     return new Date(raw).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  // ── CHANGED: Day-based label instead of month-based ──
   const getJoiningDayLabel = (student) => {
     const raw = student.joiningDate || student.createdAt;
     if (!raw) return '';
@@ -388,9 +384,12 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
 
   const totalExp     = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
-  const netProfit    = totalRevenue - totalExp;
+  const netProfit    = totalRevenue - totalExp; // purana (abhi use nahi ho raha cards mein)
 
-  // ── CHANGED: Sort by day-of-month (getDate) instead of full date ──
+  // ✅ NAYA: Actual Cash jo Paid button se aaya, minus expenses
+  const totalCashCollected = students.reduce((sum, s) => sum + (s.cashCollected || 0), 0);
+  const actualProfit       = totalCashCollected - totalExp;
+
   const filteredStudents = students
     .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
@@ -410,7 +409,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
   const unpaidCount = students.length - paidCount;
   const paidPercent = students.length ? Math.round((paidCount / students.length) * 100) : 0;
 
-  // ── CHANGED: Group by day label ──
   let groupedDisplay = null;
   if (sortByJoining) {
     const groups = {};
@@ -578,7 +576,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
       <div className="topbar">
         <div className="topbar-title">Didi's Mess</div>
         <div className="topbar-actions">
-
           {/* DARK MODE TOGGLE */}
           <button
             onClick={() => setDarkMode(prev => !prev)}
@@ -691,18 +688,34 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
       )}
 
       {/* ── STATS CARDS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, padding: '10px 12px 6px' }}>
+      {/* ✅ 5 cards: Udhari, Expense, Cash Collected, Cash Profit, Students */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, padding: '10px 12px 6px' }}>
         {[
-          { label: 'Udhari',   value: `${totalRevenue}`, color: S.green },
-          { label: 'Expense',  value: `${totalExp}`,     color: S.red   },
-          { label: 'Profit',   value: `${netProfit}`,    color: netProfit >= 0 ? S.green : S.red },
-          { label: 'Students', value: `${students.length}`, color: S.blue  },
+          { label: 'Udhari',       value: `${totalRevenue}`,      color: S.green,                                      prefix: true  },
+          { label: 'Expense',      value: `${totalExp}`,          color: S.red,                                        prefix: true  },
+          { label: 'Cash In',      value: `${totalCashCollected}`,color: S.amber,                                      prefix: true  },
+          { label: 'Cash Profit',  value: `${actualProfit}`,      color: actualProfit >= 0 ? S.green : S.red,          prefix: true  },
+          { label: 'Students',     value: `${students.length}`,   color: S.blue,                                       prefix: false },
         ].map((card, i) => (
-          <div key={i} style={{ background: S.statBg, borderRadius: 12, padding: '12px 5px', textAlign: 'center', borderLeft: `3px solid ${card.color}`, transition: 'background 0.35s' }}>
-            <div style={{ fontSize: 8, color: S.muted, textTransform: 'uppercase', marginBottom: 3 }}>{card.label}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: card.color }}>{i < 3 ? `Rs ${card.value}` : card.value}</div>
+          <div key={i} style={{ background: S.statBg, borderRadius: 12, padding: '10px 4px', textAlign: 'center', borderLeft: `3px solid ${card.color}`, transition: 'background 0.35s' }}>
+            <div style={{ fontSize: 7, color: S.muted, textTransform: 'uppercase', marginBottom: 3, letterSpacing: 0.3 }}>{card.label}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: card.color }}>{card.prefix ? `Rs ${card.value}` : card.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* ── CASH PROFIT INFO BANNER ── */}
+      {/* ✅ NAYA: Udhari vs Cash Profit ka farq samjhaane ke liye */}
+      <div style={{ margin: '4px 12px 0', background: S.amberBg, borderRadius: 10, padding: '8px 12px', border: `1px solid ${S.amberBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 10, color: S.amber, fontWeight: 700 }}>
+          💰 Milna Baki: <span style={{ color: S.red }}>Rs {totalRevenue}</span>
+        </div>
+        <div style={{ fontSize: 10, color: S.amber, fontWeight: 700 }}>
+          ✅ Mil Gaya: <span style={{ color: S.green }}>Rs {totalCashCollected}</span>
+        </div>
+        <div style={{ fontSize: 10, color: S.amber, fontWeight: 700 }}>
+          📊 Asli Faida: <span style={{ color: actualProfit >= 0 ? S.green : S.red }}>Rs {actualProfit}</span>
+        </div>
       </div>
 
       {/* ── ADVANCED: Payment Progress Bar ── */}
@@ -805,7 +818,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
         </button>
       </div>
 
-      {/* ── CHANGED: Sort banner text updated ── */}
       {sortByJoining && (
         <div className="sort-banner">
           <div className="sort-banner-text">
@@ -823,7 +835,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
           <div style={{ textAlign: 'center', color: S.muted, fontSize: 14, padding: '24px 0' }}>Koi student nahi mila</div>
         )}
 
-        {/* ── CHANGED: groupedDisplay now uses getJoiningDayLabel ── */}
         {sortByJoining && groupedDisplay && groupedDisplay.map(([dayLabel, groupStudents]) => (
           <div key={dayLabel}>
             <div className="month-group-header">
