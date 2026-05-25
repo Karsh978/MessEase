@@ -148,39 +148,40 @@ app.post('/api/attendance/toggle-meal', async (req, res) => {
     const rates = { breakfast: 25, lunch: 50, dinner: 50 };
     const amount = rates[mealType];
 
-    // Models check
     const Student = require('./models/Student');
     const Attendance = require('./models/Attendance');
 
-    // 1. Attendance update
-    const record = await Attendance.findOne({ studentId, date });
+    let record = await Attendance.findOne({ studentId, date });
     const isAlreadyMarked = record ? record[mealType] : false;
     const newStatus = !isAlreadyMarked;
 
+    // 1. Attendance update
     await Attendance.findOneAndUpdate(
       { studentId, date },
       { $set: { [mealType]: newStatus } },
-      { upsert: true, new: true }
+      { upsert: true }
     );
 
-    // 2. Student Bill Update ($inc is atomic and safe)
-    const billChange = newStatus ? amount : -amount;
-    const updatedStudent = await Student.findByIdAndUpdate(
-      studentId, 
-      { $inc: { totalDue: billChange } }, 
-      { new: true }
-    );
+    // 2. Student bill update with safety
+    const student = await Student.findById(studentId);
+    
+    // सुरक्षा: अगर totalDue गलती से null या NaN हो गया हो
+    let currentDue = student.totalDue || 0;
+    let newDue = newStatus ? currentDue + amount : currentDue - amount;
 
-    // 3. Safety: Negative bill reset
-    if (updatedStudent.totalDue < 0) {
-      updatedStudent.totalDue = 0;
-      await updatedStudent.save();
+    student.totalDue = Math.max(0, newDue);
+    
+    // सुरक्षा: सुनिश्चित करें कि cashCollected भी मौजूद है
+    if (student.cashCollected === undefined) {
+        student.cashCollected = 0;
     }
 
+    await student.save();
     res.json({ msg: "Success", newStatus });
+
   } catch (err) {
-    console.error("Toggle Error:", err);
-    res.status(500).json({ error: "Server Error" });
+    console.error("Backend Error:", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
