@@ -3,12 +3,10 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const cron = require('node-cron');
-const admin = require('firebase-admin'); // ✅ Step 1: Sabse pehle import
+const admin = require('firebase-admin');
 
-// ✅ Step 2: Config
 dotenv.config();
 
-// ✅ Step 3: Firebase Admin Initialize (env variable se, koi JSON file nahi)
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -23,20 +21,16 @@ try {
   console.error("❌ Firebase Init Error:", error.message);
 }
 
-// ✅ Step 4: Express App
 const app = express();
 
-// ✅ Step 5: MongoDB — sirf EK baar
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ Didi's Mess Database Connected!"))
   .catch((err) => console.log("❌ DB Connection Error:", err));
 
-// ✅ Step 6: Middleware
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
-// ✅ Step 7: Admin PIN Auth
 const ADMIN_PIN = process.env.ADMIN_PIN;
 const authAdmin = (req, res, next) => {
   const pin = req.headers['admin-pin'];
@@ -47,16 +41,13 @@ const authAdmin = (req, res, next) => {
   }
 };
 
-// ✅ Step 8: Models
 const Student    = require('./models/Student');
 const Attendance = require('./models/Attendance');
 const Menu       = require('./models/Menu');
 const Expense    = require('./models/Expense');
 
-// ✅ Step 9: Utils
 const sendMail = require('./utils/emailSender');
 
-// ✅ Step 10: Route Files
 const studentRoutes    = require('./routes/studentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const expenseRoutes    = require('./routes/expenseRoutes');
@@ -71,18 +62,12 @@ app.use('/api/menu/update', authAdmin);
 // --- DIRECT ROUTES ---
 // ============================================================
 
-// server.js mein ye hona chahiye:
-
-// 1. Token Save Route
-// server.js mein yahan paste karein:
-
-
-// 1. Root Route (Browser mein check karne ke liye)
+// 1. Root Route
 app.get('/', (req, res) => {
     res.send("Didi's Mess Server is Running... 🚀");
 });
 
-// 2. Health Check Route (UptimeRobot ke liye)
+// 2. Health Check Route
 app.get('/api/health', (req, res) => {
     res.status(200).send("I am awake!");
 });
@@ -91,7 +76,7 @@ app.get('/api/admin/test-get', (req, res) => {
     res.json({ msg: "Notification system is ONLINE!" });
 });
 
-// 1. Notification Route (Full Path Fix)
+// 3. Notification Route
 app.post('/api/admin/send-notification', async (req, res) => {
     try {
         const { title, body } = req.body;
@@ -99,7 +84,6 @@ app.post('/api/admin/send-notification', async (req, res) => {
         const students = await Student.find({ fcmToken: { $exists: true, $ne: "" } });
         
         if (students.length === 0) {
-            // 404 ki jagah 200 bhej rahe hain taaki error na dikhe
             return res.json({ msg: "Database mein koi token nahi mila. Student se Notification ALLOW karwaein." });
         }
 
@@ -112,7 +96,7 @@ app.post('/api/admin/send-notification', async (req, res) => {
     }
 });
 
-// 2. Token Save Route (Full Path Fix)
+// 4. Token Save Route
 app.post('/api/students/save-fcm-token', async (req, res) => {
     try {
         const { studentId, token } = req.body;
@@ -124,8 +108,7 @@ app.post('/api/students/save-fcm-token', async (req, res) => {
     }
 });
 
-
-// 1. STUDENT PORTAL LOGIN
+// 5. STUDENT PORTAL LOGIN
 app.post('/api/students/portal-login', async (req, res) => {
   try {
     const phone    = String(req.body.phone);
@@ -141,64 +124,14 @@ app.post('/api/students/portal-login', async (req, res) => {
   }
 });
 
-// server.js mein toggle-meal route ko isse replace karein
-app.post('/api/attendance/toggle-meal', async (req, res) => {
-    try {
-        const { studentId, date, mealType } = req.body;
-        const rates = { breakfast: 25, lunch: 50, dinner: 50 };
+// ❌ toggle-meal YAHAN SE HATA DIYA — attendanceRoutes.js handle karega
+// ✅ Ab /api/attendance/toggle-meal → attendanceRoutes.js jayega (sahi response dega)
 
-        // 1. Data check karein
-        if (!studentId || !mealType) {
-            return res.status(400).json({ msg: "Data missing!" });
-        }
+// 6. ATTENDANCE STATUS CHECK
+// ❌ Yeh bhi hata diya — attendanceRoutes.js handle karega
+// ✅ Ab /api/attendance/status/:date → attendanceRoutes.js jayega
 
-        // 2. Attendance record check karein
-        const record = await Attendance.findOne({ studentId, date });
-        const isAlreadyMarked = record ? record[mealType] : false;
-        const newStatus = !isAlreadyMarked;
-
-        // 3. Attendance update karein (findOneAndUpdate sabse safe hai)
-        await Attendance.findOneAndUpdate(
-            { studentId, date },
-            { $set: { [mealType]: newStatus } },
-            { upsert: true }
-        );
-
-        // 4. Student update karein ($inc use karke - isse cashCollected se koi lena dena nahi hoga)
-        const amount = rates[mealType];
-        const change = newStatus ? amount : -amount;
-
-        const updatedStudent = await Student.findByIdAndUpdate(
-            studentId,
-            { $inc: { totalDue: change } },
-            { new: true, runValidators: false } // runValidators false rakhein taaki purani fields error na dein
-        );
-
-        // 5. Safety Check: Agar bill zero se niche chala jaye
-        if (updatedStudent && updatedStudent.totalDue < 0) {
-            updatedStudent.totalDue = 0;
-            await updatedStudent.save();
-        }
-
-        res.json({ msg: "Success", newStatus });
-
-    } catch (err) {
-        console.error("BACKEND CRASH ERROR:", err.message);
-        res.status(500).json({ error: "Backend error", details: err.message });
-    }
-});
-
-// 3. ATTENDANCE STATUS CHECK
-app.get('/api/attendance/status/:date', async (req, res) => {
-  try {
-    const records = await Attendance.find({ date: req.params.date });
-    res.json(records);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 4. EMAIL REMINDER
+// 7. EMAIL REMINDER
 app.post('/api/students/send-email-reminder', async (req, res) => {
   try {
     const { email, name, amount } = req.body;
@@ -214,7 +147,7 @@ app.post('/api/students/send-email-reminder', async (req, res) => {
   }
 });
 
-// 5. PAYMENT ALERTS
+// 8. PAYMENT ALERTS
 app.get('/api/students/alerts', async (req, res) => {
   try {
     const allStudents = await Student.find({});
@@ -232,7 +165,7 @@ app.get('/api/students/alerts', async (req, res) => {
   }
 });
 
-// 6. BILL SUMMARY FOR PDF
+// 9. BILL SUMMARY FOR PDF
 app.get('/api/students/bill-summary/:id', async (req, res) => {
   try {
     const records = await Attendance.find({ studentId: req.params.id });
@@ -247,7 +180,7 @@ app.get('/api/students/bill-summary/:id', async (req, res) => {
   }
 });
 
-// 7. MARK ALL MEALS
+// 10. MARK ALL MEALS
 app.post('/api/attendance/mark-all', async (req, res) => {
   try {
     const { date, mealType } = req.body;
@@ -275,7 +208,7 @@ app.post('/api/attendance/mark-all', async (req, res) => {
   }
 });
 
-// 8. MENU — GET
+// 11. MENU — GET
 app.get('/api/menu', async (req, res) => {
   try {
     const menuData = await Menu.find();
@@ -285,7 +218,7 @@ app.get('/api/menu', async (req, res) => {
   }
 });
 
-// 9. MENU — UPDATE
+// 12. MENU — UPDATE
 app.post('/api/menu/update', async (req, res) => {
   try {
     const { day, dish, ingredients } = req.body;
@@ -298,13 +231,9 @@ app.post('/api/menu/update', async (req, res) => {
   }
 });
 
-
-
-// 12. UPDATE STUDENT PROFILE
-// server.js mein isey replace karein:
+// 13. UPDATE STUDENT PROFILE
 app.put('/api/students/update-profile/:id', async (req, res) => {
     try {
-        // Saari fields jo hum bhej rahe hain unhe yahan pakdna hoga
         const { 
             name, phone, email, password, joiningDate, 
             address, emergencyContact, profilePic 
@@ -314,22 +243,18 @@ app.put('/api/students/update-profile/:id', async (req, res) => {
         
         const updatedStudent = await Student.findByIdAndUpdate(
             req.params.id, 
-            { 
-                name, phone, email, password, joiningDate, 
-                address, emergencyContact, profilePic 
-            }, 
-            { new: true } // new:true se updated data wapas milta hai
+            { name, phone, email, password, joiningDate, address, emergencyContact, profilePic }, 
+            { new: true }
         );
         
         if (!updatedStudent) return res.status(404).json({ msg: "Student nahi mila" });
-        
         res.json(updatedStudent);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// 13. DELETE STUDENT
+// 14. DELETE STUDENT
 app.delete('/api/students/:id', async (req, res) => {
   try {
     const deletedStudent = await Student.findByIdAndDelete(req.params.id);
@@ -341,7 +266,7 @@ app.delete('/api/students/:id', async (req, res) => {
   }
 });
 
-// 14. FULL BACKUP
+// 15. FULL BACKUP
 app.get('/api/admin/backup', authAdmin, async (req, res) => {
   try {
     const students   = await Student.find();
