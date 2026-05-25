@@ -28,22 +28,27 @@ const Attendance = () => {
   const [filterMeal,  setFilterMeal]  = useState('all');
   const [showFilter,  setShowFilter]  = useState(false);
   const [bulkLoading, setBulkLoading] = useState('');
- const [processingIds, setProcessingIds] = useState(new Set());
- const [isUpdating, setIsUpdating] = useState(false);
+  const [processingIds, setProcessingIds] = useState(new Set());
   const searchRef = useRef(null);
 
   useEffect(() => { loadData(); }, [date]);
 
-  const loadData = async () => {
-    setLoading(true);
+  // ✅ FIX: showLoader parameter add kiya
+  // Pehli baar (date change pe) → loading screen dikho
+  // Toggle/markAll ke baad sync pe → loader mat dikho
+  const loadData = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     try {
-      const [sRes, aRes] = await Promise.all([fetchStudents(), fetchAttendanceStatus(date)]);
+      const [sRes, aRes] = await Promise.all([
+        fetchStudents(),
+        fetchAttendanceStatus(date)
+      ]);
       setStudents(sRes.data);
       const map = {};
       (aRes.data || []).forEach(r => { map[r.studentId] = r; });
       setStatusMap(map);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    finally { if (showLoader) setLoading(false); }
   };
 
   const flash = (text, ok = true) => {
@@ -51,7 +56,7 @@ const Attendance = () => {
     setTimeout(() => setMessage({ text:'', ok:true }), 3000);
   };
 
- const toggleMeal = async (studentId, mealType) => {
+  const toggleMeal = async (studentId, mealType) => {
     // 1. Double click protection (Lock)
     const processKey = `${studentId}-${mealType}`;
     if (processingIds.has(processKey)) return;
@@ -66,20 +71,18 @@ const Attendance = () => {
       [studentId]: { ...prev[studentId], [mealType]: !prev[studentId]?.[mealType] }
     }));
 
-    setStudents(prev => prev.map(s => 
-      s._id === studentId ? { ...s, totalDue: Math.max(0, isRemoving ? s.totalDue - price : s.totalDue + price) } : s
+    setStudents(prev => prev.map(s =>
+      s._id === studentId
+        ? { ...s, totalDue: Math.max(0, isRemoving ? s.totalDue - price : s.totalDue + price) }
+        : s
     ));
 
     try {
       // 3. Backend ko sirf inform karo
       await toggleMealAttendance({ studentId, date, mealType });
-      
-      // NOTE: Yahan res.data.totalDue ko set mat karna! 
-      // Isse race condition khatam ho jayegi.
-      
     } catch (err) {
       console.error("Update fail");
-      loadData(); // Sirf error aane par hi server se sync karo
+      loadData(false); // ✅ Error pe bhi loader nahi — sirf silent sync
     } finally {
       setProcessingIds(prev => {
         const next = new Set(prev);
@@ -87,14 +90,14 @@ const Attendance = () => {
         return next;
       });
     }
-};
+  };
 
   const markAll = async (mealType) => {
     setBulkLoading(mealType);
     try {
       await API.post('/attendance/mark-all', { date, mealType });
       flash(`✅ Sabka ${mealType} mark ho gaya!`);
-      loadData();
+      loadData(false); // ✅ FIX: loader nahi dikhega
     } catch { flash('❌ Nahi ho paya.', false); }
     finally { setBulkLoading(''); }
   };
@@ -106,7 +109,7 @@ const Attendance = () => {
     try {
       await Promise.all(targets.map(s => toggleMealAttendance({ studentId: s._id, date, mealType })));
       flash(`✅ ${targets.length} students ka ${mealType} mark hua!`);
-      loadData();
+      loadData(false); // ✅ FIX: loader nahi dikhega
     } catch { flash('❌ Kuch error hua', false); }
     finally { setBulkLoading(''); }
   };
@@ -166,9 +169,10 @@ const Attendance = () => {
 
   /* global styles injected once */
   const globalStyles = `
-    @keyframes spin { to { transform: rotate(360deg); } } html, body, #root { overflow-x: hidden !important; max-width: 100vw !important; } * { box-sizing: border-box; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    html, body, #root { overflow-x: hidden !important; max-width: 100vw !important; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    input[type=date]::-webkit-calendar-picker-indicator { 
+    input[type=date]::-webkit-calendar-picker-indicator {
       filter: ${darkMode ? 'invert(1)' : 'none'};
     }
   `;
@@ -481,7 +485,8 @@ const Attendance = () => {
             <m.Icon size={12} color={GREEN}/> {m.short}
           </button>
         ))}
-        <button onClick={loadData} style={{
+        {/* ✅ Bottom bar ka refresh button bhi silent reload kare */}
+        <button onClick={() => loadData(false)} style={{
           padding:'9px', borderRadius:'12px', border:'none',
           background:'#ffffff11', color:'#64748b', cursor:'pointer',
           display:'flex', touchAction:'manipulation'
