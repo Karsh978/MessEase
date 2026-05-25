@@ -143,46 +143,49 @@ app.post('/api/students/portal-login', async (req, res) => {
 
 // server.js mein toggle-meal route ko isse replace karein
 app.post('/api/attendance/toggle-meal', async (req, res) => {
-  try {
-    const { studentId, date, mealType } = req.body;
-    const rates = { breakfast: 25, lunch: 50, dinner: 50 };
-    const amount = rates[mealType];
+    try {
+        const { studentId, date, mealType } = req.body;
+        const rates = { breakfast: 25, lunch: 50, dinner: 50 };
 
-    const Student = require('./models/Student');
-    const Attendance = require('./models/Attendance');
+        // 1. Data check karein
+        if (!studentId || !mealType) {
+            return res.status(400).json({ msg: "Data missing!" });
+        }
 
-    let record = await Attendance.findOne({ studentId, date });
-    const isAlreadyMarked = record ? record[mealType] : false;
-    const newStatus = !isAlreadyMarked;
+        // 2. Attendance record check karein
+        const record = await Attendance.findOne({ studentId, date });
+        const isAlreadyMarked = record ? record[mealType] : false;
+        const newStatus = !isAlreadyMarked;
 
-    // 1. Attendance update
-    await Attendance.findOneAndUpdate(
-      { studentId, date },
-      { $set: { [mealType]: newStatus } },
-      { upsert: true }
-    );
+        // 3. Attendance update karein (findOneAndUpdate sabse safe hai)
+        await Attendance.findOneAndUpdate(
+            { studentId, date },
+            { $set: { [mealType]: newStatus } },
+            { upsert: true }
+        );
 
-    // 2. Student bill update with safety
-    const student = await Student.findById(studentId);
-    
-    // सुरक्षा: अगर totalDue गलती से null या NaN हो गया हो
-    let currentDue = student.totalDue || 0;
-    let newDue = newStatus ? currentDue + amount : currentDue - amount;
+        // 4. Student update karein ($inc use karke - isse cashCollected se koi lena dena nahi hoga)
+        const amount = rates[mealType];
+        const change = newStatus ? amount : -amount;
 
-    student.totalDue = Math.max(0, newDue);
-    
-    // सुरक्षा: सुनिश्चित करें कि cashCollected भी मौजूद है
-    if (student.cashCollected === undefined) {
-        student.cashCollected = 0;
+        const updatedStudent = await Student.findByIdAndUpdate(
+            studentId,
+            { $inc: { totalDue: change } },
+            { new: true, runValidators: false } // runValidators false rakhein taaki purani fields error na dein
+        );
+
+        // 5. Safety Check: Agar bill zero se niche chala jaye
+        if (updatedStudent && updatedStudent.totalDue < 0) {
+            updatedStudent.totalDue = 0;
+            await updatedStudent.save();
+        }
+
+        res.json({ msg: "Success", newStatus });
+
+    } catch (err) {
+        console.error("BACKEND CRASH ERROR:", err.message);
+        res.status(500).json({ error: "Backend error", details: err.message });
     }
-
-    await student.save();
-    res.json({ msg: "Success", newStatus });
-
-  } catch (err) {
-    console.error("Backend Error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // 3. ATTENDANCE STATUS CHECK
