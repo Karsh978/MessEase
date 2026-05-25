@@ -81,7 +81,6 @@ const Dashboard = () => {
   const [password, setPassword]   = useState('1234');
   const [dailyRate, setDailyRate] = useState(0);
 
-  // Dark Mode
   const [darkMode, setDarkMode] = useState(() => {
     try { return localStorage.getItem('didi_dark') === 'true'; } catch { return false; }
   });
@@ -93,28 +92,23 @@ const Dashboard = () => {
     document.body.style.color = S.text;
   }, [darkMode]);
 
-  // Edit Modal
   const [editStudent, setEditStudent]         = useState(null);
   const [editName, setEditName]               = useState('');
   const [editPhone, setEditPhone]             = useState('');
   const [editEmail, setEditEmail]             = useState('');
   const [editJoiningDate, setEditJoiningDate] = useState('');
 
-  // Broadcast
   const [showBroadcast, setShowBroadcast]       = useState(false);
   const [mealMsg, setMealMsg]                   = useState('');
   const [broadcastLoading, setBroadcastLoading] = useState(false);
 
-  // Sort
   const [sortByJoining, setSortByJoining] = useState(false);
 
-  // Jump to student
   const [showJumpMenu, setShowJumpMenu] = useState(false);
   const [jumpSearch, setJumpSearch]     = useState('');
   const studentRefs = useRef({});
   const jumpInputRef = useRef(null);
 
-  // Scroll to top
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   const today = new Date();
@@ -184,7 +178,6 @@ const Dashboard = () => {
   const sendWelcomeMessage = (student) => {
     const portalURL = `https://mess-ease-fawn.vercel.app/my-portal/${student._id}`;
     const groupLink = "https://chat.whatsapp.com/J5TdPYwLKjJ5IAHtyJB0y6";
-
     const msg = `Namaste ${student.name}! 🙏
 Didi's Mess mein aapka swagat hai. 🍱
 
@@ -198,7 +191,6 @@ Ab se aap apni roz ki attendance aur bill niche diye gaye link par click karke L
 📢 Group Link: ${groupLink}
 
 Kripya is link ko save kar lein. Dhanyawad! ✨`;
-
     window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -245,7 +237,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
       doc.text(`Month: ${months[viewMonth]} ${viewYear}`, 15, 32);
       doc.text(`Total Udhari (Revenue): RS ${totalRevenue}`, 15, 42);
       doc.text(`Total Expenses: RS ${totalExp}`, 15, 52);
-      // ✅ UPDATED: Report mein Cash Profit dikhao
       doc.text(`Cash Profit (Actual): RS ${actualProfit}`, 15, 62);
       doc.text(`Total Students: ${students.length}`, 15, 72);
       autoTable(doc, {
@@ -377,18 +368,50 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
     return `${day}${suffix} Tarikh`;
   };
 
+  // ── RENEWAL ALERT LOGIC ──────────────────────────────────
+  const getRenewalAlertStudents = () => {
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+
+    return students
+      .map(s => {
+        const raw = s.joiningDate || s.createdAt;
+        if (!raw) return null;
+
+        const joinDay = new Date(raw).getDate();
+
+        // Is mahine ki renewal date
+        let renewal = new Date(todayDate.getFullYear(), todayDate.getMonth(), joinDay);
+
+        // Agar wo date nikal gayi toh agli mahine ki date
+        if (renewal < todayDate) {
+          renewal = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, joinDay);
+        }
+
+        const diffMs   = renewal - todayDate;
+        const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        // Sirf 0 se 7 din ke andar wale dikhao
+        if (daysLeft < 0 || daysLeft > 7) return null;
+
+        return { ...s, daysLeft, renewalDate: renewal };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.daysLeft - b.daysLeft);
+  };
+
+  const renewalAlertStudents = getRenewalAlertStudents();
+  // ────────────────────────────────────────────────────────
+
   const filteredExpenses = expenses.filter(e => {
     const d = new Date(e.date);
     return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
   });
 
-  const totalExp     = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const totalRevenue = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
-  const netProfit    = totalRevenue - totalExp; // purana (abhi use nahi ho raha cards mein)
-
-  // ✅ NAYA: Actual Cash jo Paid button se aaya, minus expenses
-  const totalCashCollected = students.reduce((sum, s) => sum + (s.cashCollected || 0), 0);
-  const actualProfit       = totalCashCollected - totalExp;
+  const totalExp            = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const totalRevenue        = students.reduce((sum, s) => sum + (s.totalDue || 0), 0);
+  const totalCashCollected  = students.reduce((sum, s) => sum + (s.cashCollected || 0), 0);
+  const actualProfit        = totalCashCollected - totalExp;
 
   const filteredStudents = students
     .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -404,7 +427,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
     (s.phone || '').includes(jumpSearch)
   );
 
-  const highDueStudents = students.filter(s => s.totalDue > 1500).sort((a, b) => b.totalDue - a.totalDue);
   const paidCount   = students.filter(s => !s.totalDue || s.totalDue === 0).length;
   const unpaidCount = students.length - paidCount;
   const paidPercent = students.length ? Math.round((paidCount / students.length) * 100) : 0;
@@ -576,7 +598,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
       <div className="topbar">
         <div className="topbar-title">Didi's Mess</div>
         <div className="topbar-actions">
-          {/* DARK MODE TOGGLE */}
           <button
             onClick={() => setDarkMode(prev => !prev)}
             title={darkMode ? 'Light Mode' : 'Dark Mode'}
@@ -688,14 +709,13 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
       )}
 
       {/* ── STATS CARDS ── */}
-      {/* ✅ 5 cards: Udhari, Expense, Cash Collected, Cash Profit, Students */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, padding: '10px 12px 6px' }}>
         {[
-          { label: 'Udhari',       value: `${totalRevenue}`,      color: S.green,                                      prefix: true  },
-          { label: 'Expense',      value: `${totalExp}`,          color: S.red,                                        prefix: true  },
-          { label: 'Cash In',      value: `${totalCashCollected}`,color: S.amber,                                      prefix: true  },
-          { label: 'Cash Profit',  value: `${actualProfit}`,      color: actualProfit >= 0 ? S.green : S.red,          prefix: true  },
-          { label: 'Students',     value: `${students.length}`,   color: S.blue,                                       prefix: false },
+          { label: 'Udhari',      value: `${totalRevenue}`,       color: S.green,                               prefix: true  },
+          { label: 'Expense',     value: `${totalExp}`,           color: S.red,                                 prefix: true  },
+          { label: 'Cash In',     value: `${totalCashCollected}`, color: S.amber,                               prefix: true  },
+          { label: 'Cash Profit', value: `${actualProfit}`,       color: actualProfit >= 0 ? S.green : S.red,   prefix: true  },
+          { label: 'Students',    value: `${students.length}`,    color: S.blue,                                prefix: false },
         ].map((card, i) => (
           <div key={i} style={{ background: S.statBg, borderRadius: 12, padding: '10px 4px', textAlign: 'center', borderLeft: `3px solid ${card.color}`, transition: 'background 0.35s' }}>
             <div style={{ fontSize: 7, color: S.muted, textTransform: 'uppercase', marginBottom: 3, letterSpacing: 0.3 }}>{card.label}</div>
@@ -705,7 +725,6 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
       </div>
 
       {/* ── CASH PROFIT INFO BANNER ── */}
-      {/* ✅ NAYA: Udhari vs Cash Profit ka farq samjhaane ke liye */}
       <div style={{ margin: '4px 12px 0', background: S.amberBg, borderRadius: 10, padding: '8px 12px', border: `1px solid ${S.amberBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 10, color: S.amber, fontWeight: 700 }}>
           💰 Milna Baki: <span style={{ color: S.red }}>Rs {totalRevenue}</span>
@@ -718,7 +737,7 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
         </div>
       </div>
 
-      {/* ── ADVANCED: Payment Progress Bar ── */}
+      {/* ── PAYMENT PROGRESS BAR ── */}
       <div style={{ margin: '6px 12px 0', background: S.cardBg, borderRadius: 12, padding: '10px 12px', border: `1px solid ${S.border}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: S.text, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -737,22 +756,55 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
         </div>
       </div>
 
-      {/* ── ADVANCED: High Due Alert Chips ── */}
-      {highDueStudents.length > 0 && (
-        <div style={{ margin: '6px 12px 0', background: S.redBg, borderRadius: 14, padding: 12, border: `1.5px solid ${darkMode ? '#4A1515' : '#FFCDD2'}` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: S.red, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <AlertCircle size={13} color={S.red} /> Zyada Udhari ({highDueStudents.length}) — Rs 1500+
+      {/* ── RENEWAL ALERT — jinki tarikh 1 hafte mein aa rahi ho ── */}
+      {renewalAlertStudents.length > 0 && (
+        <div style={{
+          margin: '6px 12px 0',
+          background: S.amberBg,
+          borderRadius: 14,
+          padding: 12,
+          border: `1.5px solid ${S.amberBorder}`,
+        }}>
+          <div style={{
+            fontSize: 12, fontWeight: 700, color: S.amber,
+            marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            🔔 Renewal Aa Raha Hai ({renewalAlertStudents.length}) — 7 Din Mein
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {highDueStudents.slice(0, 5).map(s => (
-              <div key={s._id} onClick={() => handleJumpTo(s._id)} style={{ background: S.cardBg, border: `1px solid ${darkMode ? '#4A1515' : '#FFCDD2'}`, borderRadius: 20, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+            {renewalAlertStudents.map(s => (
+              <div
+                key={s._id}
+                onClick={() => handleJumpTo(s._id)}
+                style={{
+                  background: S.cardBg,
+                  border: `1px solid ${S.amberBorder}`,
+                  borderRadius: 20,
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
                 <span style={{ color: S.text }}>{s.name.split(' ')[0]}</span>
-                <span style={{ color: S.red }}>Rs {s.totalDue}</span>
+                <span style={{
+                  background: s.daysLeft === 0 ? S.redBg : S.amberBg,
+                  color: s.daysLeft === 0 ? S.red : S.amber,
+                  borderRadius: 10,
+                  padding: '1px 6px',
+                  fontSize: 10,
+                  fontWeight: 800,
+                }}>
+                  {s.daysLeft === 0 ? 'Aaj!' : `${s.daysLeft}d baki`}
+                </span>
               </div>
             ))}
-            {highDueStudents.length > 5 && (
-              <div style={{ background: S.cardBg, borderRadius: 20, padding: '5px 10px', fontSize: 11, color: S.muted, fontWeight: 700 }}>+{highDueStudents.length - 5} more</div>
-            )}
+          </div>
+          <div style={{ fontSize: 10, color: S.muted, marginTop: 6 }}>
+            Tap karein seedha student tak jaane ke liye
           </div>
         </div>
       )}
@@ -781,10 +833,10 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
           <UserPlus size={16} color={S.navy} /> New Registration
         </div>
         <form onSubmit={handleAdd}>
-          <input value={name}     onChange={e => setName(e.target.value)}     placeholder="Student name"            required style={inp} />
-          <input value={phone}    onChange={e => setPhone(e.target.value)}    placeholder="Phone number (Login ID)" required style={inp} />
-          <input value={email}    onChange={e => setEmail(e.target.value)}    placeholder="Email ID (for alerts)"            style={inp} />
-          <input type="password"  value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" required style={inp} />
+          <input value={name}    onChange={e => setName(e.target.value)}    placeholder="Student name"            required style={inp} />
+          <input value={phone}   onChange={e => setPhone(e.target.value)}   placeholder="Phone number (Login ID)" required style={inp} />
+          <input value={email}   onChange={e => setEmail(e.target.value)}   placeholder="Email ID (for alerts)"            style={inp} />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter Password (e.g. 1234)" required style={inp} />
           <button type="submit" style={{ width: '100%', padding: 14, background: S.navy, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, minHeight: 48 }}>
             Register Student
           </button>
@@ -929,8 +981,8 @@ const StudentCard = ({ s, studentRefs, formatJoiningDate, S, isMobile, ibtn, han
         </div>
       </div>
       <div className="btn-row">
-        <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call">   <Phone         size={14} /></button>
-        <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit">   <Pencil        size={14} /></button>
+        <button onClick={() => handleCall(s.phone)}   style={ibtn('call')} title="Call">    <Phone         size={14} /></button>
+        <button onClick={() => openEdit(s)}           style={ibtn('edit')} title="Edit">    <Pencil        size={14} /></button>
         <button onClick={() => downloadBill(s)}       style={ibtn('bill')} title="Bill PDF"><Download      size={14} /></button>
         <button onClick={() => sendWelcomeMessage(s)} style={ibtn('link')} title="WhatsApp"><MessageCircle size={14} /></button>
         <button onClick={() => handlePay(s._id)}      style={ibtn('paid')}>Paid</button>
