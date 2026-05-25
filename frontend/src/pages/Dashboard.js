@@ -287,12 +287,24 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
     } catch (err) { alert("Registration failed!"); }
   };
 
-  const handlePay = async (id) => {
+ const handlePay = async (id) => {
     if (window.confirm("Payment receive ho gayi? bill zero ho jayega.")) {
-      try { await payFees(id); loadData(); getAlerts(); }
-      catch (err) { alert("Payment error!"); }
+      try { 
+        await payFees(id); 
+        
+        // ✅ Sirf us student ka local state update karo — page reload NAHI
+        setStudents(prev => prev.map(s => 
+          s._id === id 
+            ? { ...s, totalDue: 0, cashCollected: (s.cashCollected || 0) + (s.totalDue || 0) } 
+            : s
+        ));
+        
+        // Alerts bhi silently update karo
+        getAlerts();
+        
+      } catch (err) { alert("Payment error!"); }
     }
-  };
+};
 
   const handleDelete = async (id) => {
     if (window.confirm("Kya delete karna chahti hain? Saara data khatam ho jayega.")) {
