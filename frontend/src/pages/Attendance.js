@@ -5,7 +5,6 @@ import {
   Search, X, ChevronDown, Users, Filter, RotateCcw, Zap
 } from 'lucide-react';
 
-/* ─── Green is the ONLY "active" color everywhere ─── */
 const GREEN      = '#16a34a';
 const GREEN_DARK = '#15803d';
 const GREEN_BG   = '#dcfce7';
@@ -33,9 +32,7 @@ const Attendance = () => {
 
   useEffect(() => { loadData(); }, [date]);
 
-  // ✅ FIX: showLoader parameter add kiya
-  // Pehli baar (date change pe) → loading screen dikho
-  // Toggle/markAll ke baad sync pe → loader mat dikho
+  // ✅ Full load — sirf date change pe ya pehli baar
   const loadData = async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
@@ -51,13 +48,23 @@ const Attendance = () => {
     finally { if (showLoader) setLoading(false); }
   };
 
+  // ✅ Sirf statusMap update karo — students ka totalDue mat chho
+  // Isse optimistic update overwrite nahi hoga
+  const loadStatusOnly = async () => {
+    try {
+      const aRes = await fetchAttendanceStatus(date);
+      const map = {};
+      (aRes.data || []).forEach(r => { map[r.studentId] = r; });
+      setStatusMap(map);
+    } catch (e) { console.error(e); }
+  };
+
   const flash = (text, ok = true) => {
     setMessage({ text, ok });
     setTimeout(() => setMessage({ text:'', ok:true }), 3000);
   };
 
   const toggleMeal = async (studentId, mealType) => {
-    // 1. Double click protection (Lock)
     const processKey = `${studentId}-${mealType}`;
     if (processingIds.has(processKey)) return;
     setProcessingIds(prev => new Set(prev).add(processKey));
@@ -65,7 +72,7 @@ const Attendance = () => {
     const price = mealType === 'breakfast' ? 25 : 50;
     const isRemoving = statusMap[studentId]?.[mealType];
 
-    // 2. OPTIMISTIC UPDATE (Sirf local state badlo)
+    // ✅ Optimistic update — turant UI mein dikho
     setStatusMap(prev => ({
       ...prev,
       [studentId]: { ...prev[studentId], [mealType]: !prev[studentId]?.[mealType] }
@@ -78,11 +85,12 @@ const Attendance = () => {
     ));
 
     try {
-      // 3. Backend ko sirf inform karo
       await toggleMealAttendance({ studentId, date, mealType });
+      // ✅ Success pe kuch mat karo — optimistic update sahi hai
     } catch (err) {
       console.error("Update fail");
-      loadData(false); // ✅ Error pe bhi loader nahi — sirf silent sync
+      // ✅ Sirf error pe statusMap sync karo — students mat chho
+      setTimeout(() => loadStatusOnly(), 300);
     } finally {
       setProcessingIds(prev => {
         const next = new Set(prev);
@@ -97,7 +105,8 @@ const Attendance = () => {
     try {
       await API.post('/attendance/mark-all', { date, mealType });
       flash(`✅ Sabka ${mealType} mark ho gaya!`);
-      loadData(false); // ✅ FIX: loader nahi dikhega
+      // ✅ Sirf statusMap update karo — students ka totalDue optimistic rakho
+      setTimeout(() => loadStatusOnly(), 300);
     } catch { flash('❌ Nahi ho paya.', false); }
     finally { setBulkLoading(''); }
   };
@@ -107,9 +116,12 @@ const Attendance = () => {
     if (!targets.length) { flash('Sab already marked hain!'); return; }
     setBulkLoading(mealType + '_f');
     try {
-      await Promise.all(targets.map(s => toggleMealAttendance({ studentId: s._id, date, mealType })));
+      await Promise.all(targets.map(s =>
+        toggleMealAttendance({ studentId: s._id, date, mealType })
+      ));
       flash(`✅ ${targets.length} students ka ${mealType} mark hua!`);
-      loadData(false); // ✅ FIX: loader nahi dikhega
+      // ✅ Sirf statusMap update karo
+      setTimeout(() => loadStatusOnly(), 300);
     } catch { flash('❌ Kuch error hua', false); }
     finally { setBulkLoading(''); }
   };
@@ -133,7 +145,6 @@ const Attendance = () => {
     return o;
   }, [students, statusMap]);
 
-  /* ── theme ── */
   const t = {
     bg:     darkMode ? '#0f172a' : '#f1f5f9',
     card:   darkMode ? '#1e293b' : '#ffffff',
@@ -143,7 +154,6 @@ const Attendance = () => {
     input:  darkMode ? '#1e293b' : '#ffffff',
   };
 
-  /* ── meal button — GREEN when marked ── */
   const mealBtnStyle = (sid, key) => {
     const on = !!statusMap[sid]?.[key];
     return {
@@ -167,7 +177,6 @@ const Attendance = () => {
     };
   };
 
-  /* global styles injected once */
   const globalStyles = `
     @keyframes spin { to { transform: rotate(360deg); } }
     html, body, #root { overflow-x: hidden !important; max-width: 100vw !important; }
@@ -189,7 +198,6 @@ const Attendance = () => {
     <div style={{ minHeight:'100vh', background:t.bg, fontFamily:'system-ui, -apple-system, sans-serif', transition:'background 0.3s', overflowX:'hidden', width:'100%', position:'relative' }}>
       <style>{globalStyles}</style>
 
-      {/* ── max-width wrapper, full width on mobile ── */}
       <div style={{ maxWidth:'600px', margin:'0 auto', padding:'14px 12px 120px', width:'100%', overflowX:'hidden' }}>
 
         {/* Header */}
@@ -209,7 +217,7 @@ const Attendance = () => {
           </button>
         </div>
 
-        {/* Stats — 3 equal columns */}
+        {/* Stats */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px', marginBottom:'12px' }}>
           {MEALS.map(m => {
             const count = stats[m.key] || 0;
@@ -265,10 +273,9 @@ const Attendance = () => {
           )}
         </div>
 
-        {/* Filter + Bulk — wraps on small screens */}
+        {/* Filter + Bulk */}
         <div style={{ display:'flex', gap:'7px', marginBottom:'10px', flexWrap:'wrap', alignItems:'center' }}>
 
-          {/* Filter */}
           <div style={{ position:'relative' }}>
             <button onClick={() => setShowFilter(!showFilter)} style={{
               display:'flex', alignItems:'center', gap:'4px', padding:'9px 12px',
@@ -282,7 +289,6 @@ const Attendance = () => {
             </button>
             {showFilter && (
               <>
-                {/* backdrop */}
                 <div onClick={() => setShowFilter(false)} style={{ position:'fixed', inset:0, zIndex:99 }}/>
                 <div style={{
                   position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:200,
@@ -311,7 +317,6 @@ const Attendance = () => {
             )}
           </div>
 
-          {/* Bulk mark buttons */}
           {MEALS.map(m => (
             <button key={m.key}
               onClick={() => (query || filterMeal !== 'all') ? markFiltered(m.key) : markAll(m.key)}
@@ -334,7 +339,6 @@ const Attendance = () => {
             </button>
           ))}
 
-          {/* Reset */}
           {(filterMeal !== 'all' || query) && (
             <button onClick={() => { setFilterMeal('all'); setQuery(''); }} style={{
               display:'flex', alignItems:'center', gap:'4px', padding:'9px 10px',
@@ -377,7 +381,7 @@ const Attendance = () => {
           </div>
         )}
 
-        {/* ── Student cards ── */}
+        {/* Student cards */}
         <div style={{ display:'grid', gap:'10px' }}>
           {filtered.map(s => {
             const ss = statusMap[s._id] || {};
@@ -399,7 +403,6 @@ const Attendance = () => {
                 {/* Name row */}
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'11px' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:'9px', minWidth:0 }}>
-                    {/* Avatar — green when all marked */}
                     <div style={{
                       width:'36px', height:'36px', borderRadius:'11px', flexShrink:0,
                       background: allMarked ? GREEN_BG : (darkMode ? '#273549' : '#f1f5f9'),
@@ -426,7 +429,7 @@ const Attendance = () => {
                   </div>
                 </div>
 
-                {/* Meal buttons — always 3 equal cols */}
+                {/* Meal buttons */}
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'7px' }}>
                   {MEALS.map(m => {
                     const on = !!ss[m.key];
@@ -462,7 +465,7 @@ const Attendance = () => {
 
       </div>
 
-      {/* ── Floating bottom quick-mark bar ── */}
+      {/* Floating bottom bar */}
       <div style={{
         position:'fixed', bottom:0, left:0, right:0,
         background: darkMode ? '#1e293b' : '#0f172a',
@@ -485,8 +488,8 @@ const Attendance = () => {
             <m.Icon size={12} color={GREEN}/> {m.short}
           </button>
         ))}
-        {/* ✅ Bottom bar ka refresh button bhi silent reload kare */}
-        <button onClick={() => loadData(false)} style={{
+        {/* ✅ Refresh button — sirf statusMap sync karta hai */}
+        <button onClick={() => loadStatusOnly()} style={{
           padding:'9px', borderRadius:'12px', border:'none',
           background:'#ffffff11', color:'#64748b', cursor:'pointer',
           display:'flex', touchAction:'manipulation'
