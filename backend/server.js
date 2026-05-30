@@ -166,15 +166,82 @@ app.get('/api/students/alerts', async (req, res) => {
 });
 
 // 9. BILL SUMMARY FOR PDF
+// ── SIRF YEH ROUTE REPLACE KARO server.js MEIN ──
+// Purana route dhundho: app.get('/api/students/bill-summary/:id', ...)
+// Aur isko paste karo uski jagah
+
 app.get('/api/students/bill-summary/:id', async (req, res) => {
   try {
-    const records = await Attendance.find({ studentId: req.params.id });
-    const summary = {
-      breakfast: records.filter(r => r.breakfast === true).length,
-      lunch:     records.filter(r => r.lunch     === true).length,
-      dinner:    records.filter(r => r.dinner    === true).length,
-    };
-    res.json(summary);
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ msg: "Student nahi mila" });
+
+    // ── Billing cycle calculate karo (joining day se joining day tak) ──
+    const joinRaw  = student.joiningDate || student.createdAt;
+    const joinDate = new Date(joinRaw);
+    const joinDay  = joinDate.getDate(); // e.g. 12
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Cycle start: is mahine ki joining tarikh
+    let cycleStart = new Date(today.getFullYear(), today.getMonth(), joinDay);
+
+    // Agar aaj joining tarikh se pehle hai toh pichle mahine se start
+    if (cycleStart > today) {
+      cycleStart = new Date(today.getFullYear(), today.getMonth() - 1, joinDay);
+    }
+
+    // Cycle end: cycleStart ke ek din pehle (next month ki joining se pehle)
+    const cycleEnd = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, joinDay - 1);
+
+    // ── Is cycle ke saare din generate karo ──
+    const allDays = [];
+    const cursor  = new Date(cycleStart);
+    while (cursor <= today) { // today tak hi check karo (future nahi)
+      allDays.push(new Date(cursor).toISOString().split('T')[0]);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // ── Attendance records fetch karo ──
+    const records = await Attendance.find({
+      studentId: req.params.id,
+      date: { $gte: cycleStart.toISOString().split('T')[0], $lte: today.toISOString().split('T')[0] }
+    });
+
+    // Date → record map banao
+    const recordMap = {};
+    records.forEach(r => { recordMap[r.date] = r; });
+
+    // ── Har meal ke liye present aur missing days nikalo ──
+    const meals = ['breakfast', 'lunch', 'dinner'];
+    const summary = {};
+
+    meals.forEach(meal => {
+      const presentDates = [];
+      const missingDates = [];
+
+      allDays.forEach(day => {
+        if (recordMap[day] && recordMap[day][meal] === true) {
+          presentDates.push(day);
+        } else {
+          missingDates.push(day);
+        }
+      });
+
+      summary[meal] = {
+        count:        presentDates.length,
+        presentDates: presentDates,
+        missingDates: missingDates,
+      };
+    });
+
+    res.json({
+      summary,
+      cycleStart: cycleStart.toISOString().split('T')[0],
+      cycleEnd:   cycleEnd.toISOString().split('T')[0],
+      totalDays:  allDays.length,
+    });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

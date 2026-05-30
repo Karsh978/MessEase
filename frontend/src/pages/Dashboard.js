@@ -202,32 +202,173 @@ Kripya is link ko save kar lein. Dhanyawad! ✨`;
     } catch (err) { alert("Email error!"); }
   };
 
-  const downloadBill = async (student) => {
-    try {
-      const res = await API.get(`/students/bill-summary/${student._id}`);
-      const data = res.data;
-      const doc = new jsPDF();
-      doc.setFontSize(20);
-      doc.text("DIDI'S MESS RECEIPT", 15, 20);
-      doc.setFontSize(10);
-      doc.text(`Student: ${student.name}`, 15, 30);
-      doc.text(`Total Due: RS ${student.totalDue}`, 15, 40);
-      autoTable(doc, {
-        startY: 50,
-        head: [['Meal', 'Days', 'Rate', 'Total']],
-        body: [
-          ['Breakfast', data.breakfast || 0, '25', (data.breakfast || 0) * 25],
-          ['Lunch',     data.lunch     || 0, '50', (data.lunch     || 0) * 50],
-          ['Dinner',    data.dinner    || 0, '50', (data.dinner    || 0) * 50],
-          [{ content: 'Grand Total', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } }, student.totalDue],
-        ],
-        theme: 'grid',
-        headStyles: { fillColor: [27, 58, 107] },
-      });
-      doc.save(`Bill_${student.name}.pdf`);
-    } catch (err) { alert("PDF Error!"); }
-  };
+ // ── SIRF YEH FUNCTION REPLACE KARO Dashboard.jsx MEIN ──
+// Purana: const downloadBill = async (student) => { ... }
+// Isko paste karo uski jagah
 
+const downloadBill = async (student) => {
+  try {
+    const res  = await API.get(`/students/bill-summary/${student._id}`);
+    const { summary, cycleStart, cycleEnd, totalDays } = res.data;
+
+    const rates = { breakfast: 25, lunch: 50, dinner: 50 };
+
+    // ── Date ko readable format mein convert karo ──
+    const fmtDate = (dateStr) => {
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    };
+
+    const fmtDateFull = (dateStr) => {
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const doc = new jsPDF();
+    const pageW = doc.internal.pageSize.getWidth();
+
+    // ── HEADER ──
+    doc.setFillColor(27, 58, 107);
+    doc.rect(0, 0, pageW, 32, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text("DIDI'S MESS", pageW / 2, 13, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text("Monthly Meal Bill", pageW / 2, 22, { align: 'center' });
+
+    // ── STUDENT INFO ──
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Student: ${student.name}`, 15, 42);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Phone: ${student.phone || 'N/A'}`, 15, 50);
+    doc.text(`Billing Cycle: ${fmtDateFull(cycleStart)} → ${fmtDateFull(cycleEnd)}`, 15, 58);
+    doc.text(`Total Days in Cycle (till today): ${totalDays} days`, 15, 66);
+
+    // ── MEAL SUMMARY TABLE ──
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(27, 58, 107);
+    doc.text("Meal Summary", 15, 78);
+
+    autoTable(doc, {
+      startY: 82,
+      head: [['Meal', 'Present Days', 'Rate (Rs)', 'Amount (Rs)']],
+      body: [
+        ['Breakfast (Morning)', summary.breakfast.count, '25', summary.breakfast.count * rates.breakfast],
+        ['Lunch (Noon)',        summary.lunch.count,     '50', summary.lunch.count     * rates.lunch    ],
+        ['Dinner (Night)',      summary.dinner.count,    '50', summary.dinner.count    * rates.dinner   ],
+        [
+          { content: 'TOTAL DUE', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold', fillColor: [27, 58, 107], textColor: [255,255,255] } },
+          { content: `Rs ${student.totalDue}`, styles: { fontStyle: 'bold', fillColor: [27, 58, 107], textColor: [255,255,255] } }
+        ],
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [27, 58, 107], textColor: [255,255,255], fontStyle: 'bold' },
+      styles: { fontSize: 10 },
+    });
+
+    let y = doc.lastAutoTable.finalY + 12;
+
+    // ── MISSING DAYS SECTION ──
+    const mealLabels = {
+      breakfast: '🌅 Breakfast Missing Days',
+      lunch:     '☀️ Lunch Missing Days',
+      dinner:    '🌙 Dinner Missing Days',
+    };
+
+    const mealColors = {
+      breakfast: [255, 243, 224], // amber light
+      lunch:     [253, 236, 234], // red light
+      dinner:    [243, 238, 255], // purple light
+    };
+
+    const mealHeaderColors = {
+      breakfast: [230, 81, 0],
+      lunch:     [192, 57, 43],
+      dinner:    [124, 58, 237],
+    };
+
+    ['breakfast', 'lunch', 'dinner'].forEach((meal) => {
+      const missing = summary[meal].missingDates;
+
+      // Page break check
+      if (y > 240) { doc.addPage(); y = 20; }
+
+      // Section header
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...mealHeaderColors[meal]);
+      doc.text(mealLabels[meal], 15, y);
+      doc.setTextColor(30, 30, 30);
+      y += 6;
+
+      if (missing.length === 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(30, 126, 74);
+        doc.text(`✅ Koi missing day nahi! Poore ${totalDays} din present raha.`, 15, y);
+        doc.setTextColor(30, 30, 30);
+        y += 10;
+      } else {
+        // Missing dates ko rows mein group karo (5 per row)
+        const rows = [];
+        for (let i = 0; i < missing.length; i += 5) {
+          rows.push(missing.slice(i, i + 5).map(fmtDate));
+        }
+
+        autoTable(doc, {
+          startY: y,
+          body: rows,
+          theme: 'plain',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+            fillColor: mealColors[meal],
+            textColor: [80, 80, 80],
+            halign: 'center',
+          },
+          columnStyles: {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 30 },
+            2: { cellWidth: 30 },
+            3: { cellWidth: 30 },
+            4: { cellWidth: 30 },
+          },
+          margin: { left: 15 },
+        });
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Total missing: ${missing.length} days`, 15, doc.lastAutoTable.finalY + 5);
+        doc.setTextColor(30, 30, 30);
+        y = doc.lastAutoTable.finalY + 12;
+      }
+    });
+
+    // ── FOOTER ──
+    if (y > 260) { doc.addPage(); y = 20; }
+    doc.setDrawColor(200, 200, 200);
+    doc.line(15, y, pageW - 15, y);
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(130, 130, 130);
+    doc.text("Generated by Didi's Mess Management System", pageW / 2, y, { align: 'center' });
+    doc.text(`Print Date: ${new Date().toLocaleDateString('en-IN')}`, pageW / 2, y + 5, { align: 'center' });
+
+    doc.save(`Bill_${student.name}_${fmtDateFull(cycleStart)}.pdf`);
+
+  } catch (err) {
+    console.error(err);
+    alert("PDF Error! Console check karein.");
+  }
+};
   const downloadMonthlyReport = () => {
     try {
       const doc = new jsPDF();
