@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Expense = require('../models/Expense');
 
-// Check karein yahan '/all' hi likha hai na?
+// Get All Expenses
 router.get('/all', async (req, res) => {
     try {
         const expenses = await Expense.find();
@@ -12,13 +12,24 @@ router.get('/all', async (req, res) => {
     }
 });
 
-// Check karein yahan '/add' hi likha hai na?
+// Add Expense
 router.post('/add', async (req, res) => {
     try {
         const { item, amount } = req.body;
         const newExpense = new Expense({ item, amount });
         await newExpense.save();
         res.json(newExpense);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ✅ Delete Expense
+router.delete('/:id', async (req, res) => {
+    try {
+        const deleted = await Expense.findByIdAndDelete(req.params.id);
+        if (!deleted) return res.status(404).json({ msg: "Expense nahi mila!" });
+        res.json({ msg: "Deleted!" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
